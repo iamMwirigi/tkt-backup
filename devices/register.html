@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Register Device</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .form-group { margin-bottom: 15px; }
+        label { display: block; margin-bottom: 5px; }
+        input { padding: 8px; width: 300px; }
+        button { padding: 10px 20px; background: #007bff; color: white; border: none; cursor: pointer; }
+        #response { margin-top: 20px; padding: 10px; border: 1px solid #ddd; }
+    </style>
+</head>
+<body>
+    <h2>Register New Device</h2>
+    <form id="registerForm">
+        <div class="form-group">
+            <label for="device_uuid">Device UUID:</label>
+            <input type="text" id="device_uuid" name="device_uuid" required>
+        </div>
+        <div class="form-group">
+            <label for="device_name">Device Name:</label>
+            <input type="text" id="device_name" name="device_name" required>
+        </div>
+        <button type="submit">Register Device</button>
+    </form>
+    <div id="response"></div>
+
+    <script>
+        document.getElementById('registerForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const response = document.getElementById('response');
+            
+            try {
+                const res = await fetch('register.php', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        device_uuid: document.getElementById('device_uuid').value,
+                        device_name: document.getElementById('device_name').value
+                    })
+                });
+                
+                const data = await res.json();
+                response.innerHTML = `<pre>${JSON.stringify(data, null, 2)}</pre>`;
+            } catch (error) {
+                response.innerHTML = `<pre>Error: ${error.message}</pre>`;
+            }
+        });
+    </script>
+</body>
+</html> 

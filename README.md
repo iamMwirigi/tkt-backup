@@ -1,17 +1,21 @@
 # API Endpoints
 
+
+
+## Production
 ```
-POST http://localhost/tkt_dev/devices/register.php
-POST http://localhost/tkt_dev/auth/login.php
-POST http://localhost/tkt_dev/bookings/create.php
-POST http://localhost/tkt_dev/trips/create.php
+POST http://149.56.195.219:8080/auth/login.php
+POST http://149.56.195.219:8080/bookings/create.php
+POST http://149.56.195.219:8080/trips/create.php
 ```
 
-Example request:
+## Example Requests
+
+### Production
 ```bash
-curl -X POST http://localhost/tkt_dev/devices/register.php \
+curl -X POST http://149.56.195.219:8080/auth/login.php \
   -H "Content-Type: application/json" \
-  -d '{"device_uuid": "test123", "device_name": "Test Device"}'
+  -d '{"email": "admin@example.com", "password": "admin123", "device_id": "test123"}'
 ```
 
 ## Setup Instructions
@@ -27,3 +31,8 @@ curl -X POST http://localhost/tkt_dev/devices/register.php \
 ## Default Admin Credentials
 - Email: admin@example.com
 - Password: admin123 
+POST https://tkt.ke/devices/register.php
+POST https://tkt.ke/auth/login.php
+POST https://tkt.ke/bookings/create.php
+POST https://tkt.ke/trips/create.php
+

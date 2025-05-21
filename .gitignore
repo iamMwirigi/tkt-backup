@@ -40,9 +40,6 @@ temp/
 *.sqlite3
 *.db
 
-# Configuration files with sensitive data
-# config/db.php
-# config/*.local.php
 
 # XAMPP specific
 /opt/lampp/htdocs/tkt_dev/xampp/

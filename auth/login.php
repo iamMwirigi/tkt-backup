@@ -1,4 +1,24 @@
 <?php
+// Start session at the very beginning, before any output.
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
+
+// Attempt to load environment variables from a .env file
+// Assumes .env file and vendor directory are one level up from this auth directory
+if (file_exists(__DIR__ . '/../vendor/autoload.php')) {
+    require_once __DIR__ . '/../vendor/autoload.php';
+    if (class_exists('Dotenv\Dotenv')) {
+        try {
+            $dotenv = Dotenv\Dotenv::createImmutable(__DIR__ . '/..'); // Path to the directory containing .env (tkt-backup)
+            $dotenv->load();
+        } catch (\Dotenv\Exception\InvalidPathException $e) {
+            // .env file not found, proceed with defaults or system env vars
+            error_log("Dotenv Error in login.php: " . $e->getMessage()); // Log error for debugging
+        }
+    }
+}
+
 require_once '../config/db.php';
 require_once '../utils/functions.php';
 

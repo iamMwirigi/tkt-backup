@@ -70,4 +70,3 @@ function calculateNetAmount($gross_amount, $deductions) {
     }
     return $gross_amount - $total_deductions;
 }
-?> 

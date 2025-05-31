@@ -13,7 +13,7 @@ class Database {
         $this->port = getenv('DB_PORT') ?: '3306';
         $this->db_name = getenv('DB_NAME') ?: 'tkt';
         $this->username = getenv('DB_USER') ?: 'root';
-        $this->password = getenv('DB_PASSWORD') ?: 'a26N8Iv22TC4kJdb';
+        $this->password = getenv('DB_PASSWORD') ?: '31278527';
         
         // For services like PlanetScale:
         // $this->host = getenv('MYSQL_HOST') ?: getenv('DB_HOST');

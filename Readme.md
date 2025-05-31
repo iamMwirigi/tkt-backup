@@ -66,6 +66,96 @@ Welcome to the Vehicle Ticketing System. This project powers ticket sales, booki
 
 ---
 
+## 🧪 Testing Endpoints with Postman
+
+To test the API endpoints, you can use a tool like Postman.
+
+### Prerequisites
+
+1.  **Web Server**: Ensure you have a local web server (e.g., XAMPP, MAMP, WAMP) running and serving the project files from a directory like `htdocs/tkt-backup/`. The base URL will typically be `http://localhost/tkt-backup/`.
+2.  **Database**:
+    *   Make sure your MySQL server is running.
+    *   Create a database named `tkt` (or as configured in `config/db.php` or your environment variables).
+    *   Import the necessary database schema (tables like `devices`, `users`, etc.).
+    *   Ensure the database credentials in `config/db.php` match your local setup, or set the corresponding environment variables (`DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`).
+3.  **Postman**: Download and install Postman from postman.com.
+
+### General Postman Request Setup
+
+*   **Method**: Select the appropriate HTTP method (e.g., `POST`, `GET`).
+*   **URL**: Enter the full URL to the endpoint (e.g., `http://localhost/tkt-backup/devices/register.php`).
+*   **Headers**:
+    *   For `POST` or `PUT` requests sending JSON data, add:
+        *   `Key`: `Content-Type`
+        *   `Value`: `application/json`
+    *   For endpoints requiring device identification (after registration), add:
+        *   `Key`: `X-Device-ID`
+        *   `Value`: The `device_uuid` of the registered device.
+*   **Body**: For `POST` or `PUT` requests, go to the "Body" tab, select "raw", and choose "JSON" from the dropdown. Then, enter your JSON payload.
+
+### Example 1: Registering a Device
+
+Endpoint: `POST /devices/register.php`
+
+1.  **Method**: `POST`
+2.  **URL**: `http://localhost/tkt-backup/devices/register.php`
+3.  **Headers**:
+    *   `Content-Type`: `application/json`
+4.  **Body** (raw, JSON):
+    ```json
+    {
+      "device_uuid": "YOUR_UNIQUE_DEVICE_UUID_HERE",
+      "device_name": "My Test Device"
+    }
+    ```
+    Replace `"YOUR_UNIQUE_DEVICE_UUID_HERE"` with a unique string.
+5.  **Send** the request.
+
+    *   **Successful Response (201 Created)**:
+        ```json
+        {
+          "message": "Device registered successfully",
+          "device_id": 1 // This is the auto-incremented ID from the database
+        }
+        ```
+    *   **Error Response (400 Bad Request - Device already registered)**:
+        ```json
+        {
+          "error": "Device already registered"
+        }
+        ```
+
+### Example 2: Logging In (Conceptual - requires `X-Device-ID`)
+
+Endpoint: `POST /auth/login.php` (This endpoint requires a registered device)
+
+1.  **Method**: `POST`
+2.  **URL**: `http://localhost/tkt-backup/auth/login.php`
+3.  **Headers**:
+    *   `Content-Type`: `application/json`
+    *   `X-Device-ID`: Use the `device_uuid` you used during device registration (e.g., `"YOUR_UNIQUE_DEVICE_UUID_HERE"`).
+4.  **Body** (raw, JSON - fields depend on `login.php` implementation):
+    The `login.php` script expects `email`, `password`, and `device_id` (which is the device's UUID) in the body.
+    ```json
+    {
+      "username": "your_username",
+      "password": "your_password"
+    }
+    ```
+5.  **Send** the request.
+
+    *   Look for a successful login response (e.g., session token) or error messages.
+
+### Testing Other Endpoints
+
+Refer to the "Key Endpoints" table below for module paths and specific PHP files.
+
+*   For endpoints that create or modify data (`create.php`, `convert-booking.php`), you will typically use `POST`.
+*   Remember to include the `X-Device-ID` header with the `device_uuid` for endpoints that require device verification.
+*   Check the specific PHP file or documentation for required JSON body parameters.
+
+---
+
 ## 💡 Delivery Logic
 
 - Frontend fetches predefined deduction rules from `delivery_deductions`

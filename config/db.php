@@ -8,12 +8,12 @@ class Database {
     public $conn;
 
     public function __construct() {
-        // Use Render's environment variables with local defaults
-        $this->host = getenv('MYSQL_HOST') ?: '127.0.0.1';
-        $this->port = getenv('MYSQL_PORT') ?: '3306';
-        $this->db_name = getenv('MYSQLDATABASE') ?: 'tkt';
-        $this->username = getenv('MYSQLUSER') ?: 'root';
-        $this->password = getenv('MYSQLPASSWORD') ?: '31278527';
+        // Use environment variables with local defaults
+        $this->host = getenv('DB_HOST') ?: '127.0.0.1';
+        $this->port = getenv('DB_PORT') ?: '3306';
+        $this->db_name = getenv('DB_NAME') ?: 'tkt';
+        $this->username = getenv('DB_USER') ?: 'root';
+        $this->password = getenv('DB_PASSWORD') ?: '31278527';
         
         // For services like PlanetScale:
         // $this->host = getenv('MYSQL_HOST') ?: getenv('DB_HOST');

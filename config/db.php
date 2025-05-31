@@ -9,11 +9,12 @@ class Database {
 
     public function __construct() {
         // Use environment variables with local defaults
-        $this->host = getenv('DB_HOST') ?: '127.0.0.1';
-        $this->port = getenv('DB_PORT') ?: '3306';
-        $this->db_name = getenv('DB_NAME') ?: 'tkt';
-        $this->username = getenv('DB_USER') ?: 'root';
-        $this->password = getenv('DB_PASSWORD') ?: '31278527';
+       $this->host = '142.44.187.111';
+$this->port = '3306';
+$this->db_name = 'tkt';
+$this->username = 'dev_ops1';
+$this->password = 'a26N8Iv22TC4kJdb';
+
         
         
         // For services like PlanetScale:

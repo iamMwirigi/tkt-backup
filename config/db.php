@@ -15,6 +15,7 @@ class Database {
         $this->username = getenv('DB_USER') ?: 'root';
         $this->password = getenv('DB_PASSWORD') ?: '31278527';
         
+        
         // For services like PlanetScale:
         // $this->host = getenv('MYSQL_HOST') ?: getenv('DB_HOST');
     }

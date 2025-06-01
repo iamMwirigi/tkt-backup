@@ -5,6 +5,7 @@ class Database {
     private $username;
     private $password;
     private $port;
+    private $options;
     public $conn;
 
     public function __construct() {
@@ -13,35 +14,83 @@ class Database {
         $this->db_name = getenv('DB_NAME') ?: 'tkt';
         $this->username = getenv('DB_USER') ?: 'root';
         $this->password = getenv('DB_PASSWORD') ?: '';
+        
+        $this->options = [
+            PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+            PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+            PDO::MYSQL_ATTR_INIT_COMMAND => "SET NAMES utf8mb4",
+            PDO::ATTR_PERSISTENT => false, // Better for scaling
+            PDO::ATTR_TIMEOUT => 30, // Connection timeout in seconds
+            PDO::MYSQL_ATTR_USE_BUFFERED_QUERY => true,
+            // Connection retry settings
+            PDO::ATTR_EMULATE_PREPARES => false,
+            PDO::MYSQL_ATTR_TCP_KEEPALIVE => 1,
+            PDO::MYSQL_ATTR_TCP_KEEPALIVE_IDLE => 60,
+        ];
+        
+        // Only add SSL options if configured
+        // if (getenv('MYSQL_SSL_CA_PATH')) {
+        //     $this->options[PDO::MYSQL_ATTR_SSL_CA] = getenv('MYSQL_SSL_CA_PATH');
+        //     $this->options[PDO::MYSQL_ATTR_SSL_VERIFY_SERVER_CERT] = false;
+        // }
     }
 
     public function getConnection() {
-        $this->conn = null;
-
         try {
-            $this->conn = new PDO(
-                "mysql:host={$this->host};port={$this->port};dbname={$this->db_name}",
-                $this->username,
-                $this->password,
-                [
-                    PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
-                    PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-                    PDO::MYSQL_ATTR_INIT_COMMAND => "SET NAMES utf8mb4",
-                    PDO::MYSQL_ATTR_SSL_CA => getenv('MYSQL_SSL_CA_PATH'),
-                    PDO::MYSQL_ATTR_SSL_VERIFY_SERVER_CERT => false
-                ]
-            );
+            if (!$this->conn || !$this->isConnectionAlive()) {
+                $this->conn = new PDO(
+                    "mysql:host={$this->host};port={$this->port};dbname={$this->db_name}",
+                    $this->username,
+                    $this->password,
+                    $this->options
+                );
+            }
+            return $this->conn;
         } catch (PDOException $e) {
-            error_log("Database connection failed: " . $e->getMessage());
-            header('Content-Type: application/json');
-            exit(json_encode([
-                'error' => true,
-                'message' => 'Database connection failed',
-                'details' => $e->getMessage()
-            ]));
+            // Attempt one reconnect on failure
+            try {
+                error_log("Primary connection failed, attempting reconnect: " . $e->getMessage());
+                $this->conn = new PDO(
+                    "mysql:host={$this->host};port={$this->port};dbname={$this->db_name}",
+                    $this->username,
+                    $this->password,
+                    $this->options
+                );
+                return $this->conn;
+            } catch (PDOException $e) {
+                $this->handleConnectionError($e);
+            }
         }
+    }
 
-        return $this->conn;
+    private function isConnectionAlive() {
+        try {
+            $this->conn->query('SELECT 1');
+            return true;
+        } catch (PDOException $e) {
+            return false;
+        }
+    }
+
+    private function handleConnectionError($e) {
+        error_log("Database connection failed: " . $e->getMessage());
+        
+        // Special handling for "MySQL server has gone away"
+        if (strpos($e->getMessage(), 'MySQL server has gone away') !== false) {
+            error_log("Attempting to re-establish database connection...");
+            sleep(1); // Wait before retrying
+            $this->getConnection(); // Try again
+            return;
+        }
+        
+        header('Content-Type: application/json');
+        http_response_code(503); // Service Unavailable
+        exit(json_encode([
+            'error' => true,
+            'message' => 'Database connection failed',
+            'details' => $e->getMessage(),
+            'advice' => 'The application could not connect to the database. Please try again later.'
+        ]));
     }
 }
 ?>

@@ -1,4 +1,9 @@
 <?php
+// FOR DEBUGGING ONLY - !! REMOVE OR DISABLE FOR PRODUCTION !!
+ini_set('display_errors', 1);
+ini_set('log_errors', 1); // Ensure errors are also logged
+error_reporting(E_ALL);
+
 // Start session at the very beginning, before any output.
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
@@ -11,11 +16,32 @@ if (file_exists(__DIR__ . '/../vendor/autoload.php')) {
     if (class_exists('Dotenv\Dotenv')) {
         try {
             $dotenv = Dotenv\Dotenv::createImmutable(__DIR__ . '/..'); // Path to the directory containing .env (tkt-backup)
-            $dotenv->load();
+            $loadedVars = $dotenv->load(); // Attempt to load and capture result
+
+            // Log what Dotenv reports as loaded
+            // error_log("Dotenv loaded variables: " . print_r($loadedVars, true)); // Uncomment for very verbose logging if needed
+
+            if (array_key_exists('DB_PASSWORD', $loadedVars)) {
+                error_log("login.php: Dotenv reports DB_PASSWORD was loaded from .env file.");
+            } else {
+                error_log("login.php: Dotenv reports DB_PASSWORD was NOT found in the loaded variables from .env file. Check .env content and path.");
+            }
+
+            // Check critical $_ENV variables directly after load
+            error_log("login.php: _ENV['DB_HOST'] = " . ($_ENV['DB_HOST'] ?? 'NOT SET'));
+            error_log("login.php: _ENV['DB_USER'] = " . ($_ENV['DB_USER'] ?? 'NOT SET'));
+            error_log("login.php: _ENV['DB_PASSWORD'] = " . (isset($_ENV['DB_PASSWORD']) && $_ENV['DB_PASSWORD'] !== '' ? 'SET (hidden length)' : 'NOT SET or EMPTY'));
+            error_log("login.php: _ENV['DB_NAME'] = " . ($_ENV['DB_NAME'] ?? 'NOT SET'));
+
         } catch (\Dotenv\Exception\InvalidPathException $e) {
-            // .env file not found, proceed with defaults or system env vars
-            error_log("Dotenv Error in login.php: " . $e->getMessage()); // Log error for debugging
+            error_log("Dotenv Error in login.php: Invalid path. Could not find .env file at " . realpath(__DIR__ . '/..') . ". Message: " . $e->getMessage());
+        } catch (\Dotenv\Exception\InvalidFileException $e) {
+            error_log("Dotenv Error in login.php: Invalid .env file (e.g., permissions, syntax). Message: " . $e->getMessage());
+        } catch (Exception $e) { // Catch any other Dotenv related exceptions
+            error_log("Dotenv Error in login.php: An unexpected error occurred during .env loading. Message: " . $e->getMessage());
         }
+    } else {
+        error_log("Dotenv class 'Dotenv\Dotenv' not found in login.php. Ensure 'vlucas/phpdotenv' is installed via Composer and autoloaded.");
     }
 }
 
@@ -86,5 +112,9 @@ try {
     ]);
 
 } catch (PDOException $e) {
-    sendResponse(500, ['error' => 'Database error: ' . $e->getMessage()]);
+    sendResponse(500, [
+        'error' => true,
+        'message' => 'Login failed due to a database issue.',
+        'details' => $e->getMessage() // This will include the specific SQL error
+    ]);
 }

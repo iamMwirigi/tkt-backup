@@ -64,3 +64,5 @@ temp/
 Thumbs.db
 .DS_Store
 .directory 
+
+/db-backup/

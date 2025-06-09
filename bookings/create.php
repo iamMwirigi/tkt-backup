@@ -1,53 +1,95 @@
+
 <?php
-header('Content-Type: application/json');
-header('Access-Control-Allow-Origin: *');
-header('Access-Control-Allow-Methods: POST');
-header('Access-Control-Allow-Headers: Content-Type, Authorization');
+// /opt/lampp/htdocs/tkt-backup/bookings/create.php
 
-require_once '../config/database.php';
-require_once '../security/auth.php';
+// For development: display all errors
+ini_set('display_errors', 1);
+error_reporting(E_ALL);
 
-// Check if it's a POST request
-if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-    http_response_code(405);
-    echo json_encode(['error' => 'Method not allowed']);
-    exit;
-}
-
-// Get the request body
-$data = json_decode(file_get_contents('php://input'), true);
-
-// Validate required fields
-$required_fields = ['trip_id', 'passenger_name', 'passenger_phone', 'seat_number'];
-foreach ($required_fields as $field) {
-    if (!isset($data[$field]) || empty($data[$field])) {
-        http_response_code(400);
-        echo json_encode(['error' => "Missing required field: $field"]);
-        exit;
+// Autoload Composer packages and load environment variables
+if (file_exists(__DIR__ . '/../vendor/autoload.php')) {
+    require_once __DIR__ . '/../vendor/autoload.php';
+    try {
+        $dotenv = Dotenv\Dotenv::createImmutable(__DIR__ . '/..');
+        $dotenv->load();
+    } catch (Exception $e) {
+        error_log("Dotenv loading error: " . $e->getMessage());
     }
 }
 
+// Include utility functions and database configuration
+require_once __DIR__ . '/../utils/functions.php';
+require_once __DIR__ . '/../config/db.php';    
+
+
+// Set common headers
+header('Content-Type: application/json');
+header('Access-Control-Allow-Origin: *'); // Consider restricting in production
+header('Access-Control-Allow-Methods: POST');
+header('Access-Control-Allow-Headers: Content-Type, Authorization');
+
+// Ensure user is logged in for booking creation
+ensureLoggedIn();
+
+$db = new Database();
+$conn = $db->getConnection();
+
+$company_id = $_SESSION['company_id'];
+$user_id = $_SESSION['user_id']; // User performing the action
+
+if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+    sendResponse(405, ['error' => true, 'message' => 'Method not allowed.']);
+}
+
 try {
+    $data = json_decode(file_get_contents('php://input'), true);
+    if (json_last_error() !== JSON_ERROR_NONE) {
+        sendResponse(400, ['error' => true, 'message' => 'Invalid JSON input.']);
+    }
+
+    // Validate required fields - aligning with api/bookings/index.php and database schema
+    validateRequiredFields(['trip_id', 'customer_name', 'customer_phone', 'destination_id', 'seat_number', 'fare_amount'], $data);
+
+    $trip = getValidTripOrFail($conn, $data['trip_id'], $company_id);
+    $vehicle_id = $trip['vehicle_id']; // Get vehicle_id from the validated trip
+
+    getValidDestinationOrFail($conn, $data['destination_id'], $company_id); // Validates destination
+
+    if (!isSeatAvailable($conn, $data['trip_id'], $vehicle_id, $data['seat_number'], $company_id)) {
+        sendResponse(409, ['error' => true, 'message' => 'Seat ' . htmlspecialchars($data['seat_number']) . ' is already booked for this trip.']);
+    }
+    
+    if (!is_numeric($data['fare_amount']) || $data['fare_amount'] < 0) {
+        sendResponse(400, ['error' => true, 'message' => 'Invalid fare amount.']);
+    }
+
     // Insert the booking
-    $stmt = $pdo->prepare("INSERT INTO bookings (trip_id, passenger_name, passenger_phone, seat_number, created_at) VALUES (?, ?, ?, ?, NOW())");
+    $stmt = $conn->prepare("
+        INSERT INTO bookings (company_id, trip_id, vehicle_id, user_id, customer_name, customer_phone, destination_id, seat_number, fare_amount, status)
+        VALUES (:company_id, :trip_id, :vehicle_id, :user_id, :customer_name, :customer_phone, :destination_id, :seat_number, :fare_amount, :status)
+    ");
     $stmt->execute([
-        $data['trip_id'],
-        $data['passenger_name'],
-        $data['passenger_phone'],
-        $data['seat_number']
+        ':company_id' => $company_id,
+        ':trip_id' => $data['trip_id'],
+        ':vehicle_id' => $vehicle_id,
+        ':user_id' => $user_id,
+        ':customer_name' => $data['customer_name'], // Changed from passenger_name
+        ':customer_phone' => $data['customer_phone'], // Changed from passenger_phone
+        ':destination_id' => $data['destination_id'],
+        ':seat_number' => $data['seat_number'],
+        ':fare_amount' => $data['fare_amount'],
+        ':status' => $data['status'] ?? 'booked' // Default to 'booked'
     ]);
 
-    $booking_id = $pdo->lastInsertId();
+    $booking_id = $conn->lastInsertId();
 
-    // Return success response
-    echo json_encode([
-        'success' => true,
-        'message' => 'Booking created successfully',
-        'booking_id' => $booking_id
-    ]);
+    sendResponse(201, ['success' => true, 'message' => 'Booking created successfully.', 'booking_id' => $booking_id]);
 
 } catch (PDOException $e) {
-    http_response_code(500);
-    echo json_encode(['error' => 'Database error: ' . $e->getMessage()]);
+    error_log("PDOException in bookings/create.php: " . $e->getMessage() . " SQLSTATE: " . $e->getCode());
+    sendResponse(500, ['error' => true, 'message' => 'Database operation failed.', 'details' => $e->getMessage()]);
+} catch (Exception $e) {
+    error_log("Exception in bookings/create.php: " . $e->getMessage());
+    sendResponse(500, ['error' => true, 'message' => 'An unexpected error occurred.', 'details' => $e->getMessage()]);
 }
 ?> 

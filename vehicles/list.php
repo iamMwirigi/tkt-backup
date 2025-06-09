@@ -4,12 +4,21 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
+// Debug logging
+error_log("Session contents: " . print_r($_SESSION, true));
+error_log("Cookie contents: " . print_r($_COOKIE, true));
+
 // Check if user is logged in
 if (!isset($_SESSION['user_id']) || !isset($_SESSION['company_id'])) {
     header('Content-Type: application/json');
     echo json_encode([
         'error' => true,
-        'message' => 'Unauthorized access. Please login first.'
+        'message' => 'Unauthorized access. Please login first.',
+        'debug' => [
+            'session_id' => session_id(),
+            'session_exists' => !empty($_SESSION),
+            'session_vars' => array_keys($_SESSION)
+        ]
     ]);
     exit;
 }

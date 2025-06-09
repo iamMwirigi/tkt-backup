@@ -1,6 +1,8 @@
-
 <?php
-// /opt/lampp/htdocs/tkt-backup/bookings/create.php
+// Start session at the very beginning
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 
 // For development: display all errors
 ini_set('display_errors', 1);
@@ -20,7 +22,6 @@ if (file_exists(__DIR__ . '/../vendor/autoload.php')) {
 // Include utility functions and database configuration
 require_once __DIR__ . '/../utils/functions.php';
 require_once __DIR__ . '/../config/db.php';    
-
 
 // Set common headers
 header('Content-Type: application/json');
@@ -73,12 +74,12 @@ try {
         ':trip_id' => $data['trip_id'],
         ':vehicle_id' => $vehicle_id,
         ':user_id' => $user_id,
-        ':customer_name' => $data['customer_name'], // Changed from passenger_name
-        ':customer_phone' => $data['customer_phone'], // Changed from passenger_phone
+        ':customer_name' => $data['customer_name'],
+        ':customer_phone' => $data['customer_phone'],
         ':destination_id' => $data['destination_id'],
         ':seat_number' => $data['seat_number'],
         ':fare_amount' => $data['fare_amount'],
-        ':status' => $data['status'] ?? 'booked' // Default to 'booked'
+        ':status' => $data['status'] ?? 'booked'
     ]);
 
     $booking_id = $conn->lastInsertId();

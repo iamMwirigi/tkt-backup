@@ -207,4 +207,24 @@ function getValidDestinationOrFail($conn, $destination_id, $company_id) {
     return $destination;
 }
 
+/**
+ * Generates a unique trip code based on company prefix, route code, and departure time.
+ * @param string $company_prefix Three-letter company code
+ * @param string $route_code Three-letter route code
+ * @param string $departure_time Departure time in Y-m-d H:i:s format
+ * @return string Generated trip code
+ */
+function generateTripCode($company_prefix, $route_code, $departure_time) {
+    // Convert departure time to date
+    $date = new DateTime($departure_time);
+    
+    // Format: COMPANY-ROUTE-YYYYMMDD
+    return sprintf(
+        '%s-%s-%s',
+        $company_prefix,
+        $route_code,
+        $date->format('Ymd')
+    );
+}
+
 ?>

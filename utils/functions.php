@@ -66,18 +66,34 @@ function checkAuth() {
  * @return string The device ID
  */
 function checkDevice() {
+    // Debug logging
+    error_log("All headers: " . print_r(getallheaders(), true));
+    error_log("SERVER variables: " . print_r($_SERVER, true));
+    
     // Check X-Device-ID header first
     if (isset($_SERVER['HTTP_X_DEVICE_ID'])) {
+        error_log("Found X-Device-ID: " . $_SERVER['HTTP_X_DEVICE_ID']);
         return $_SERVER['HTTP_X_DEVICE_ID'];
     }
     
     // Check device_kubwa header
     if (isset($_SERVER['HTTP_DEVICE_KUBWA'])) {
+        error_log("Found device_kubwa: " . $_SERVER['HTTP_DEVICE_KUBWA']);
         return $_SERVER['HTTP_DEVICE_KUBWA'];
     }
     
     // If neither header is present, send error
-    sendResponse(400, ['error' => true, 'message' => 'Device ID is required']);
+    error_log("No device ID found in headers");
+    sendResponse(400, [
+        'error' => true, 
+        'message' => 'Device ID is required',
+        'debug' => [
+            'headers' => getallheaders(),
+            'server_vars' => array_filter($_SERVER, function($key) {
+                return strpos($key, 'HTTP_') === 0;
+            }, ARRAY_FILTER_USE_KEY)
+        ]
+    ]);
 }
 
 /**

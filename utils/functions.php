@@ -66,10 +66,18 @@ function checkAuth() {
  * @return string The device ID
  */
 function checkDevice() {
-    if (!isset($_SERVER['HTTP_X_DEVICE_ID'])) {
-        sendResponse(400, ['error' => true, 'message' => 'Device ID is required']);
+    // Check X-Device-ID header first
+    if (isset($_SERVER['HTTP_X_DEVICE_ID'])) {
+        return $_SERVER['HTTP_X_DEVICE_ID'];
     }
-    return $_SERVER['HTTP_X_DEVICE_ID'];
+    
+    // Check device_kubwa header
+    if (isset($_SERVER['HTTP_DEVICE_KUBWA'])) {
+        return $_SERVER['HTTP_DEVICE_KUBWA'];
+    }
+    
+    // If neither header is present, send error
+    sendResponse(400, ['error' => true, 'message' => 'Device ID is required']);
 }
 
 /**

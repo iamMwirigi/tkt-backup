@@ -49,6 +49,46 @@ function ensureLoggedIn() {
 }
 
 /**
+ * Checks if user is authenticated and returns user_id.
+ * Sends a 401 response if not authenticated.
+ * @return int The authenticated user's ID
+ */
+function checkAuth() {
+    if (!isset($_SESSION['user_id'])) {
+        sendResponse(401, ['error' => true, 'message' => 'Unauthorized. Please login.']);
+    }
+    return $_SESSION['user_id'];
+}
+
+/**
+ * Checks if device ID is provided in headers.
+ * Sends a 400 response if not provided.
+ * @return string The device ID
+ */
+function checkDevice() {
+    if (!isset($_SERVER['HTTP_X_DEVICE_ID'])) {
+        sendResponse(400, ['error' => true, 'message' => 'Device ID is required']);
+    }
+    return $_SERVER['HTTP_X_DEVICE_ID'];
+}
+
+/**
+ * Verifies if the device is registered for the user.
+ * @param PDO $conn Database connection object
+ * @param int $user_id The user's ID
+ * @param string $device_id The device ID to verify
+ * @return bool True if device is valid, false otherwise
+ */
+function verifyDevice($conn, $user_id, $device_id) {
+    $stmt = $conn->prepare("
+        SELECT id FROM devices 
+        WHERE device_uuid = ? AND user_id = ?
+    ");
+    $stmt->execute([$device_id, $user_id]);
+    return $stmt->fetch() !== false;
+}
+
+/**
  * Checks if a specific seat is available for a given trip and vehicle.
  * @param PDO $conn Database connection object.
  * @param int $trip_id

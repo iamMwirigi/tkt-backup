@@ -137,3 +137,59 @@ Once logged in, you can create a new trip. This request requires the active sess
     }
   }
   ```
+
+---
+
+## 4. List Vehicles
+
+After logging in, you can retrieve a list of vehicles for your company. This endpoint requires an active session.
+
+### Request
+
+- **Method:** `GET`
+- **URL:** `https://tkt-backup.onrender.com/vehicles/list.php`
+- **Headers:**
+  ```json
+  {
+    "Content-Type": "application/json"
+  }
+  ```
+  *(Ensure the session cookie from login is sent with this request)*
+
+### Expected Response
+
+- **Status:** `200 OK`
+- **Body:**
+  ```json
+  {
+    "error": false,
+    "message": "Vehicles retrieved successfully",
+    "data": [
+      {
+        "id": 1,
+        "plate_number": "KBR 123A",
+        "vehicle_type": "Bus",
+        "created_at": "2025-04-14 10:09:04",
+        "owner_name": "James Kariuki",
+        "owner_phone": "0722000001",
+        "owner_id_number": "12345678",
+        "seats": [
+          {
+            "seat_number": "1A",
+            "position": "left",
+            "is_reserved": 0
+          },
+          {
+            "seat_number": "1B",
+            "position": "right",
+            "is_reserved": 0
+          }
+        ]
+      }
+    ]
+  }
+  ```
+
+> **Note:** This endpoint requires authentication. If you're not logged in, you'll receive an "Unauthorized access" error.
+
+

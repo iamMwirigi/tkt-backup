@@ -48,8 +48,8 @@ try {
     // Get all devices for the company
     $stmt = $conn->prepare("
         SELECT 
-            d.id,
-            d.name,
+            d.device_id as id,
+            d.device_name as name,
             d.location,
             d.status,
             d.last_seen,

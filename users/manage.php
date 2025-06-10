@@ -54,6 +54,18 @@ try {
                 ]);
             }
             
+            // Verify office belongs to company if provided
+            if (isset($data['office_id'])) {
+                $stmt = $conn->prepare("SELECT id FROM offices WHERE id = ? AND company_id = ?");
+                $stmt->execute([$data['office_id'], $company_id]);
+                if (!$stmt->fetch()) {
+                    sendResponse(400, [
+                        'error' => true,
+                        'message' => 'Office not found or does not belong to your company'
+                    ]);
+                }
+            }
+            
             $stmt = $conn->prepare("
                 INSERT INTO users (company_id, name, email, password, role, office_id) 
                 VALUES (?, ?, ?, ?, ?, ?)
@@ -88,6 +100,18 @@ try {
                 ]);
             }
             
+            // Verify office belongs to company if provided
+            if (isset($data['office_id'])) {
+                $stmt = $conn->prepare("SELECT id FROM offices WHERE id = ? AND company_id = ?");
+                $stmt->execute([$data['office_id'], $company_id]);
+                if (!$stmt->fetch()) {
+                    sendResponse(400, [
+                        'error' => true,
+                        'message' => 'Office not found or does not belong to your company'
+                    ]);
+                }
+            }
+            
             $updates = [];
             $params = [];
             
@@ -96,6 +120,15 @@ try {
                 $params[] = $data['name'];
             }
             if (isset($data['email'])) {
+                // Check if new email already exists
+                $stmt = $conn->prepare("SELECT id FROM users WHERE email = ? AND id != ?");
+                $stmt->execute([$data['email'], $data['id']]);
+                if ($stmt->fetch()) {
+                    sendResponse(400, [
+                        'error' => true,
+                        'message' => 'Email already exists'
+                    ]);
+                }
                 $updates[] = "email = ?";
                 $params[] = $data['email'];
             }

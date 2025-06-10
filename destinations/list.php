@@ -17,7 +17,7 @@ if (file_exists(__DIR__ . '/../vendor/autoload.php')) {
             $dotenv = Dotenv\Dotenv::createImmutable(__DIR__ . '/..');
             $dotenv->load();
         } catch (Exception $e) {
-            error_log("Dotenv Error in vehicles/list.php: " . $e->getMessage());
+            error_log("Dotenv Error in destinations/list.php: " . $e->getMessage());
         }
     }
 }
@@ -36,34 +36,42 @@ try {
     $db = new Database();
     $conn = $db->getConnection();
     
-    // Get all vehicles with their owners for the company
+    // Get all destinations with their fares for the company's routes
     $stmt = $conn->prepare("
         SELECT 
-            v.*,
-            vo.name as owner_name,
-            vo.phone as owner_phone,
-            vo.id_number as owner_id_number,
-            (
-                SELECT COUNT(*) 
-                FROM trips t 
-                WHERE t.vehicle_id = v.id 
-                AND t.status != 'completed'
-            ) as active_trips,
-            (
-                SELECT COUNT(*) 
-                FROM vehicle_seats vs 
-                WHERE vs.vehicle_id = v.id
-            ) as total_seats
-        FROM vehicles v
-        LEFT JOIN vehicle_owners vo ON v.owner_id = vo.id
-        WHERE v.company_id = ?
-        ORDER BY v.created_at DESC
+            d.*,
+            r.name as route_name,
+            r.description as route_description,
+            GROUP_CONCAT(
+                JSON_OBJECT(
+                    'id', f.id,
+                    'label', f.label,
+                    'amount', f.amount
+                )
+            ) as fares
+        FROM destinations d
+        JOIN routes r ON d.route_id = r.id
+        LEFT JOIN fares f ON d.id = f.destination_id
+        WHERE r.company_id = ?
+        GROUP BY d.id
+        ORDER BY r.name, d.stop_order
     ");
     $stmt->execute([$company_id]);
-    $vehicles = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    $destinations = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    
+    // Process the fares JSON string into an array
+    foreach ($destinations as &$destination) {
+        if ($destination['fares']) {
+            $destination['fares'] = array_map(function($fare) {
+                return json_decode($fare, true);
+            }, explode(',', $destination['fares']));
+        } else {
+            $destination['fares'] = [];
+        }
+    }
     
     sendResponse(200, [
-        'vehicles' => $vehicles
+        'destinations' => $destinations
     ]);
     
 } catch (Exception $e) {

@@ -9,25 +9,12 @@ class Database {
     public $conn;
 
     public function __construct() {
-        // === OPTION 1: HARDCODED FOR TESTING ===
-        $this->host = '127.0.0.1';        // or 'localhost'
-        $this->port = '3306';
-        $this->db_name = 'tkt';
-        $this->username = 'root';
-        $this->password = '31278527';  $this->host = '127.0.0.1';
-        $this->port = '3306';
-        $this->db_name = /*'tkt';
-        $this->username = 'root';
-        $this->password = '';  // XAMPP default has no password
-
-        // === OPTION 2: LOAD FROM ENV (uncomment if using phpdotenv) ===
-        /*
+        // Load from environment variables
         $this->host = getenv('DB_HOST') ?: '127.0.0.1';
-        $this->port = getenv('DB*_PORT') ?: '3306';
+        $this->port = getenv('DB_PORT') ?: '3306';
         $this->db_name = getenv('DB_NAME') ?: 'tkt';
         $this->username = getenv('DB_USER') ?: 'root';
         $this->password = getenv('DB_PASSWORD') ?: '';
-        */
 
         $this->options = [
             PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,

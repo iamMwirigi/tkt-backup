@@ -84,9 +84,14 @@ try {
             sendResponse(400, ['error' => 'Device ID is required for non-admin users']);
         }
 
-        // Check if device exists
-        $stmt = $conn->prepare("SELECT id FROM devices WHERE device_uuid = ?");
-        $stmt->execute([$data['device_id']]);
+        // Check if device exists and is associated with this user
+        $stmt = $conn->prepare("
+            SELECT id FROM devices 
+            WHERE device_uuid = ? 
+            AND (user_id = ? OR user_id IS NULL)
+            AND is_active = 1
+        ");
+        $stmt->execute([$data['device_id'], $user['id']]);
         $device = $stmt->fetch();
 
         if (!$device) {
@@ -101,6 +106,14 @@ try {
                 $data['device_id'],
                 $_SERVER['HTTP_USER_AGENT'] ?? 'Unknown Device'
             ]);
+        } else if ($device['user_id'] === null) {
+            // Update existing device with user_id if it wasn't set
+            $stmt = $conn->prepare("
+                UPDATE devices 
+                SET user_id = ?, company_id = ? 
+                WHERE device_uuid = ?
+            ");
+            $stmt->execute([$user['id'], $user['company_id'], $data['device_id']]);
         }
     }
 

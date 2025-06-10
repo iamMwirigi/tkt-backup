@@ -55,21 +55,25 @@ try {
             }
             
             $stmt = $conn->prepare("
-                INSERT INTO devices (company_id, user_id, device_uuid, device_name, is_active) 
-                VALUES (?, ?, ?, ?, ?)
+                INSERT INTO devices (company_id, device_uuid, device_name, is_active) 
+                VALUES (?, ?, ?, 1)
             ");
             $stmt->execute([
                 $company_id,
-                $data['user_id'] ?? null,
                 $data['device_uuid'],
-                $data['device_name'],
-                $data['is_active'] ?? 1
+                $data['device_name']
             ]);
             
             sendResponse(201, [
                 'success' => true,
                 'message' => 'Device created successfully',
-                'device_id' => $conn->lastInsertId()
+                'device' => [
+                    'id' => $conn->lastInsertId(),
+                    'device_uuid' => $data['device_uuid'],
+                    'device_name' => $data['device_name'],
+                    'status' => 'active',
+                    'registered_at' => date('Y-m-d H:i:s')
+                ]
             ]);
             break;
             
@@ -107,23 +111,6 @@ try {
                 $updates[] = "device_name = ?";
                 $params[] = $data['device_name'];
             }
-            if (isset($data['user_id'])) {
-                // Verify user belongs to company
-                $stmt = $conn->prepare("SELECT id FROM users WHERE id = ? AND company_id = ?");
-                $stmt->execute([$data['user_id'], $company_id]);
-                if (!$stmt->fetch()) {
-                    sendResponse(400, [
-                        'error' => true,
-                        'message' => 'User not found or does not belong to your company'
-                    ]);
-                }
-                $updates[] = "user_id = ?";
-                $params[] = $data['user_id'];
-            }
-            if (isset($data['is_active'])) {
-                $updates[] = "is_active = ?";
-                $params[] = $data['is_active'] ? 1 : 0;
-            }
             
             if (empty($updates)) {
                 sendResponse(400, [
@@ -159,23 +146,6 @@ try {
                 sendResponse(404, [
                     'error' => true,
                     'message' => 'Device not found or does not belong to your company'
-                ]);
-            }
-            
-            // Check if device has any active bookings
-            $stmt = $conn->prepare("
-                SELECT COUNT(*) as count 
-                FROM bookings b
-                JOIN users u ON b.user_id = u.id
-                WHERE u.id = ? AND b.status != 'completed'
-            ");
-            $stmt->execute([$data['id']]);
-            $result = $stmt->fetch();
-            
-            if ($result['count'] > 0) {
-                sendResponse(400, [
-                    'error' => true,
-                    'message' => 'Cannot delete device with active bookings'
                 ]);
             }
             

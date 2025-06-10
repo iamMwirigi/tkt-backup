@@ -8,8 +8,9 @@ POST /devices/register.php
 Content-Type: application/json
 
 {
-    "device_uuid": "test-device-001",
-    "device_name": "Test Device"
+    "device_id": "DEVICE123",
+    "device_name": "POS Terminal 1",
+    "location": "Nairobi Branch"
 }
 ```
 
@@ -20,9 +21,10 @@ Response:
     "message": "Device registered successfully",
     "device": {
         "id": 1,
-        "device_uuid": "test-device-001",
-        "device_name": "Test Device",
+        "device_id": "DEVICE123",
+        "name": "POS Terminal 1",
         "status": "active",
+        "registered_by": "John Doe",
         "registered_at": "2024-03-20 10:00:00"
     }
 }

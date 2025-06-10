@@ -131,12 +131,44 @@ function checkDevice() {
  * @return bool True if device is valid, false otherwise
  */
 function verifyDevice($conn, $user_id, $device_id) {
-    $stmt = $conn->prepare("
-        SELECT id FROM devices 
-        WHERE device_uuid = ? AND user_id = ?
-    ");
-    $stmt->execute([$device_id, $user_id]);
-    return $stmt->fetch() !== false;
+    try {
+        // First check if device exists and is active
+        $stmt = $conn->prepare("
+            SELECT id, user_id 
+            FROM devices 
+            WHERE device_uuid = ? AND is_active = 1
+        ");
+        $stmt->execute([$device_id]);
+        $device = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        if (!$device) {
+            error_log("Device not found or inactive: " . $device_id);
+            return false;
+        }
+
+        // If device has no user_id, it's a new device - register it
+        if (!$device['user_id']) {
+            $stmt = $conn->prepare("
+                UPDATE devices 
+                SET user_id = ?, company_id = (SELECT company_id FROM users WHERE id = ?)
+                WHERE id = ?
+            ");
+            $stmt->execute([$user_id, $user_id, $device['id']]);
+            error_log("Registered new device: " . $device_id . " for user: " . $user_id);
+            return true;
+        }
+
+        // If device has a user_id, check if it matches
+        if ($device['user_id'] != $user_id) {
+            error_log("Device belongs to different user. Device user: " . $device['user_id'] . ", Request user: " . $user_id);
+            return false;
+        }
+
+        return true;
+    } catch (Exception $e) {
+        error_log("Error verifying device: " . $e->getMessage());
+        return false;
+    }
 }
 
 /**

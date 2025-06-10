@@ -77,19 +77,18 @@ try {
 
     // Create payment record
     $stmt = $conn->prepare("INSERT INTO payments (
-        company_id, ticket_id, amount, payment_method,
-        transaction_id, status, created_by
-    ) VALUES (?, ?, ?, ?, ?, 'pending', ?)");
+        company_id, booking_id, payment_method,
+        transaction_reference, amount, status, created_at
+    ) VALUES (?, ?, ?, ?, ?, 'pending', NOW())");
 
     $payment_method = $data['payment_method'] ?? 'cash';
     $transaction_id = $data['transaction_id'] ?? null;
     $stmt->execute([
         $company_id,
-        $ticket_id,
-        $data['fare_amount'],
+        null, // booking_id is null for direct tickets
         $payment_method,
         $transaction_id,
-        $user_id
+        $data['fare_amount']
     ]);
 
     // Commit transaction

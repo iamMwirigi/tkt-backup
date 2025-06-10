@@ -27,11 +27,17 @@ require_once __DIR__ . '/../utils/functions.php';
 
 header('Content-Type: application/json');
 
+// Authentication disabled for testing
 // Check if user is logged in
 // $auth = checkAuth();
 // $user_id = $auth['user_id'];
 // $company_id = $auth['company_id'];
 // $user_role = $_SESSION['role'] ?? '';
+
+// Use dummy values for testing
+$user_id = 1;
+$company_id = 1;
+$user_role = 'admin';
 
 // Authentication disabled for testing
 /*

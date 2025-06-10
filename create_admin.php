@@ -18,13 +18,6 @@ try {
         ]
     );
 
-    // Password to use
-    $admin_password = "admin123";
-    $hashed_password = password_hash($admin_password, PASSWORD_DEFAULT);
-
-    // Debug output
-    echo "Generated password hash: " . $hashed_password . "\n";
-
     // First ensure company exists
     $stmt = $conn->prepare("
         INSERT INTO companies (name) 
@@ -41,25 +34,30 @@ try {
     if (!$company) {
         throw new Exception("Failed to get company ID");
     }
+
+    // Delete existing admin users
+    $stmt = $conn->prepare("DELETE FROM users WHERE email = 'admin@zawadi.co.ke'");
+    $stmt->execute();
     
-    // Create or update admin user
+    // Create new admin user with fresh password
+    $admin_password = "admin123";
+    $hashed_password = password_hash($admin_password, PASSWORD_DEFAULT);
+    
     $stmt = $conn->prepare("
         INSERT INTO users (company_id, name, email, password, role) 
         VALUES (?, 'Admin User', 'admin@zawadi.co.ke', ?, 'admin')
-        ON DUPLICATE KEY UPDATE 
-        password = VALUES(password),
-        role = 'admin'
     ");
     
     $result = $stmt->execute([$company['id'], $hashed_password]);
     
     if ($result) {
-        echo "Admin user created/updated successfully!\n";
+        echo "Admin user created successfully!\n";
         echo "You can now login with:\n";
         echo "Email: admin@zawadi.co.ke\n";
         echo "Password: admin123\n";
+        echo "Generated hash: " . $hashed_password . "\n";
     } else {
-        echo "Failed to create/update admin user\n";
+        echo "Failed to create admin user\n";
     }
     
 } catch (Exception $e) {

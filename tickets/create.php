@@ -1,10 +1,31 @@
 <?php
-session_start();
-header('Content-Type: application/json');
+// FOR DEBUGGING ONLY - !! REMOVE OR DISABLE FOR PRODUCTION !!
+ini_set('display_errors', 1);
+ini_set('log_errors', 1);
+error_reporting(E_ALL);
 
-// Use absolute paths from project root
-require_once __DIR__ . '/../config/database.php';
+// Start session at the very beginning
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
+
+// Load environment variables
+if (file_exists(__DIR__ . '/../vendor/autoload.php')) {
+    require_once __DIR__ . '/../vendor/autoload.php';
+    if (class_exists('Dotenv\Dotenv')) {
+        try {
+            $dotenv = Dotenv\Dotenv::createImmutable(__DIR__ . '/..');
+            $dotenv->load();
+        } catch (Exception $e) {
+            error_log("Dotenv Error in tickets/create.php: " . $e->getMessage());
+        }
+    }
+}
+
+require_once __DIR__ . '/../config/db.php';
 require_once __DIR__ . '/../utils/functions.php';
+
+header('Content-Type: application/json');
 
 // Check if user is logged in
 if (!checkAuth()) {
@@ -31,8 +52,11 @@ foreach ($required_fields as $field) {
 }
 
 try {
+    $db = new Database();
+    $conn = $db->getConnection();
+    
     // Start transaction
-    $conn->begin_transaction();
+    $conn->beginTransaction();
 
     // Get trip details
     $trip_id = $data['trip_id'];
@@ -41,9 +65,8 @@ try {
                            JOIN vehicles v ON t.vehicle_id = v.id 
                            JOIN routes r ON t.route_id = r.id 
                            WHERE t.id = ? AND t.company_id = ?");
-    $stmt->bind_param("ii", $trip_id, $company_id);
-    $stmt->execute();
-    $trip = $stmt->get_result()->fetch_assoc();
+    $stmt->execute([$trip_id, $company_id]);
+    $trip = $stmt->fetch(PDO::FETCH_ASSOC);
 
     if (!$trip) {
         throw new Exception("Trip not found or doesn't belong to your company");
@@ -53,9 +76,8 @@ try {
     $seat_number = $data['seat_number'];
     $stmt = $conn->prepare("SELECT COUNT(*) as count FROM tickets 
                            WHERE trip_id = ? AND seat_number = ?");
-    $stmt->bind_param("is", $trip_id, $seat_number);
-    $stmt->execute();
-    $seat_check = $stmt->get_result()->fetch_assoc();
+    $stmt->execute([$trip_id, $seat_number]);
+    $seat_check = $stmt->fetch(PDO::FETCH_ASSOC);
 
     if ($seat_check['count'] > 0) {
         throw new Exception("Seat $seat_number is already taken for this trip");
@@ -65,9 +87,8 @@ try {
     $destination_id = $data['destination_id'];
     $stmt = $conn->prepare("SELECT * FROM destinations 
                            WHERE id = ? AND route_id = ?");
-    $stmt->bind_param("ii", $destination_id, $trip['route_id']);
-    $stmt->execute();
-    $destination = $stmt->get_result()->fetch_assoc();
+    $stmt->execute([$destination_id, $trip['route_id']]);
+    $destination = $stmt->fetch(PDO::FETCH_ASSOC);
 
     if (!$destination) {
         throw new Exception("Invalid destination for this route");
@@ -80,8 +101,7 @@ try {
     ) VALUES (?, ?, ?, ?, ?, ?, ?, 'unpaid')");
 
     $location = $data['location'] ?? 'Terminal';
-    $stmt->bind_param(
-        "iiiiiss",
+    $stmt->execute([
         $company_id,
         $trip['vehicle_id'],
         $trip_id,
@@ -89,9 +109,8 @@ try {
         $destination_id,
         $trip['route_name'],
         $location
-    );
-    $stmt->execute();
-    $ticket_id = $conn->insert_id;
+    ]);
+    $ticket_id = $conn->lastInsertId();
 
     // Create payment record
     $stmt = $conn->prepare("INSERT INTO payments (
@@ -101,16 +120,14 @@ try {
 
     $payment_method = $data['payment_method'] ?? 'cash';
     $transaction_id = $data['transaction_id'] ?? null;
-    $stmt->bind_param(
-        "iidssi",
+    $stmt->execute([
         $company_id,
         $ticket_id,
         $data['fare_amount'],
         $payment_method,
         $transaction_id,
         $user['id']
-    );
-    $stmt->execute();
+    ]);
 
     // Commit transaction
     $conn->commit();
@@ -124,7 +141,9 @@ try {
 
 } catch (Exception $e) {
     // Rollback transaction on error
-    $conn->rollback();
+    if (isset($conn)) {
+        $conn->rollBack();
+    }
     
     http_response_code(400);
     echo json_encode([

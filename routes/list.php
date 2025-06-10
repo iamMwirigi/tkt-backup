@@ -34,12 +34,14 @@ $company_id = $auth['company_id'];
 $user_role = $_SESSION['role'] ?? '';
 
 // For non-admin users, device ID is required
+/*
 if ($user_role !== 'admin') {
     $device_id = checkDevice();
     if (!$device_id) {
         sendResponse(400, ['error' => true, 'message' => 'Device ID is required for non-admin users']);
     }
 }
+*/
 
 try {
     $db = new Database();

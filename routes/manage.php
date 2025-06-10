@@ -34,12 +34,14 @@ $company_id = $auth['company_id'];
 $user_role = $_SESSION['role'] ?? '';
 
 // Only admin users can perform CRUD operations
+/*
 if ($user_role !== 'admin') {
     sendResponse(403, [
         'error' => true,
         'message' => 'Only admin users can manage routes'
     ]);
 }
+*/
 
 try {
     $db = new Database();

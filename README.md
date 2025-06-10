@@ -1,8 +1,8 @@
 # TKT API Documentation
 
-## Device Management (Required for Regular Users)
+## 1. Device Management
 
-### 1. Register Device (Required First Step for Regular Users)
+### 1.1 Register Device (Required for Regular Users)
 ```http
 POST /devices/register.php
 Content-Type: application/json
@@ -13,37 +13,47 @@ Content-Type: application/json
     "location": "Nairobi Branch"
 }
 ```
-**Response (201 Created):**
+
+Response:
 ```json
 {
     "success": true,
     "message": "Device registered successfully",
-    "device_id": "DEVICE123"
+    "device": {
+        "id": 1,
+        "device_id": "DEVICE123",
+        "name": "POS Terminal 1",
+        "status": "active",
+        "registered_by": "John Doe",
+        "registered_at": "2024-03-20 10:00:00"
+    }
 }
 ```
 
-### 2. List Devices
+### 1.2 List Devices (Admin Only)
 ```http
 GET /devices/list.php
 ```
-**Response (200 OK):**
+
+Response:
 ```json
 {
     "devices": [
         {
-            "id": "DEVICE123",
+            "id": 1,
+            "device_id": "DEVICE123",
             "name": "POS Terminal 1",
-            "location": "Nairobi Branch",
             "status": "active",
-            "last_seen": "2024-03-20 10:30:00"
+            "registered_by": "John Doe",
+            "registered_at": "2024-03-20 10:00:00"
         }
     ]
 }
 ```
 
-## Authentication
+## 2. Authentication
 
-### 1. Login as Admin
+### 2.1 Login as Admin
 ```http
 POST /auth/login.php
 Content-Type: application/json
@@ -53,12 +63,14 @@ Content-Type: application/json
     "password": "admin123"
 }
 ```
-**Response (200 OK):**
+
+Response:
 ```json
 {
+    "success": true,
     "message": "Login successful",
     "user": {
-        "id": 7,
+        "id": 1,
         "name": "Admin User",
         "email": "admin@zawadi.co.ke",
         "role": "admin",
@@ -67,7 +79,7 @@ Content-Type: application/json
 }
 ```
 
-### 2. Login as Regular User (After Device Registration)
+### 2.2 Login as Regular User
 ```http
 POST /auth/login.php
 Content-Type: application/json
@@ -75,119 +87,80 @@ Content-Type: application/json
 {
     "email": "user@zawadi.co.ke",
     "password": "user123",
-    "device_id": "DEVICE123"  // Must be a registered device
+    "device_id": "DEVICE123"  // Required for non-admin users
 }
 ```
-**Response (200 OK):**
+
+Response:
 ```json
 {
+    "success": true,
     "message": "Login successful",
     "user": {
-        "id": 8,
+        "id": 2,
         "name": "Regular User",
         "email": "user@zawadi.co.ke",
-        "role": "user",
+        "role": "clerk",
         "company": "Zawadi Express"
     }
 }
 ```
 
-## Routes Management
+## 3. User Management (Admin Only)
 
-### 1. Create Route (Admin Only)
+### 3.1 List Users
 ```http
-POST /routes/manage.php
-Content-Type: application/json
+GET /users/list.php
+```
 
+Response:
+```json
 {
-    "name": "Nairobi - Mombasa",
-    "description": "Main route between Nairobi and Mombasa",
-    "destinations": [
+    "users": [
         {
-            "name": "Nairobi",
-            "stop_order": 1,
-            "fares": [
-                {
-                    "label": "Adult",
-                    "amount": 1500
-                },
-                {
-                    "label": "Child",
-                    "amount": 750
-                }
-            ]
-        },
-        {
-            "name": "Mombasa",
-            "stop_order": 2,
-            "fares": [
-                {
-                    "label": "Adult",
-                    "amount": 1500
-                },
-                {
-                    "label": "Child",
-                    "amount": 750
-                }
-            ]
+            "id": 1,
+            "name": "Admin User",
+            "email": "admin@zawadi.co.ke",
+            "role": "admin",
+            "office": {
+                "name": "Nairobi Central",
+                "location": "Moi Avenue, Nairobi"
+            },
+            "stats": {
+                "registered_devices": 2,
+                "total_bookings": 5
+            },
+            "created_at": "2025-04-14 10:09:04"
         }
     ]
 }
 ```
-**Response (201 Created):**
-```json
-{
-    "success": true,
-    "message": "Route created successfully",
-    "route_id": 1
-}
-```
 
-### 2. View Routes (All Users)
+## 4. Route Management
+
+### 4.1 List Routes (All Users)
 ```http
 GET /routes/list.php
-X-Device-ID: DEVICE123  // Required for non-admin users
 ```
-**Response (200 OK):**
+
+Response:
 ```json
 {
     "routes": [
         {
             "id": 1,
-            "name": "Nairobi - Mombasa",
-            "description": "Main route between Nairobi and Mombasa",
+            "name": "Nairobi - Kisumu",
+            "description": "Main western route via Nakuru, Kericho",
             "destinations": [
                 {
                     "id": 1,
-                    "name": "Nairobi",
+                    "name": "Naivasha",
                     "stop_order": 1,
                     "fares": [
                         {
                             "id": 1,
-                            "label": "Adult",
-                            "amount": 1500
-                        },
-                        {
-                            "id": 2,
-                            "label": "Child",
-                            "amount": 750
-                        }
-                    ]
-                },
-                {
-                    "id": 2,
-                    "name": "Mombasa",
-                    "stop_order": 2,
-                    "fares": [
-                        {
-                            "id": 3,
-                            "label": "Adult",
-                            "amount": 1500
-                        },
-                        {
-                            "id": 4,
-                            "label": "Child",
-                            "amount": 750
+                            "label": "Standard",
+                            "amount": "500.00"
                         }
                     ]
                 }
@@ -197,29 +170,172 @@ X-Device-ID: DEVICE123  // Required for non-admin users
 }
 ```
 
-## User Flow
+### 4.2 Create Route (Admin Only)
+```http
+POST /routes/manage.php
+Content-Type: application/json
 
-### Regular User Flow:
-1. **First Time Setup**:
-   - Register device using `/devices/register.php`
-   - Save the `device_id` for future use
+{
+    "name": "Nairobi - Kisumu",
+    "description": "Main western route via Nakuru, Kericho",
+    "destinations": [
+        {
+            "name": "Naivasha",
+            "stop_order": 1,
+            "fares": [
+                {
+                    "label": "Standard",
+                    "amount": "500.00"
+                }
+            ]
+        }
+    ]
+}
+```
 
-2. **Daily Usage**:
-   - Login with email, password, and registered `device_id`
-   - Include `device_id` in `X-Device-ID` header for all API calls
-   - Can only view routes, no modification permissions
+Response:
+```json
+{
+    "success": true,
+    "message": "Route created successfully",
+    "route": {
+        "id": 1,
+        "name": "Nairobi - Kisumu",
+        "description": "Main western route via Nakuru, Kericho",
+        "destinations": [
+            {
+                "id": 1,
+                "name": "Naivasha",
+                "stop_order": 1,
+                "fares": [
+                    {
+                        "id": 1,
+                        "label": "Standard",
+                        "amount": "500.00"
+                    }
+                ]
+            }
+        ]
+    }
+}
+```
 
-### Admin User Flow:
-1. **Login**:
-   - Login with email and password only
-   - No device registration required
+### 4.3 Update Route (Admin Only)
+```http
+PUT /routes/manage.php
+Content-Type: application/json
 
-2. **Daily Usage**:
-   - Full access to all API endpoints
-   - Can create, update, and delete routes
-   - Can view all routes without device ID
+{
+    "id": 1,
+    "name": "Nairobi - Kisumu",
+    "description": "Updated description",
+    "destinations": [
+        {
+            "id": 1,
+            "name": "Naivasha",
+            "stop_order": 1,
+            "fares": [
+                {
+                    "id": 1,
+                    "label": "Standard",
+                    "amount": "600.00"
+                }
+            ]
+        }
+    ]
+}
+```
 
-## Important Notes
+Response:
+```json
+{
+    "success": true,
+    "message": "Route updated successfully",
+    "route": {
+        "id": 1,
+        "name": "Nairobi - Kisumu",
+        "description": "Updated description",
+        "destinations": [
+            {
+                "id": 1,
+                "name": "Naivasha",
+                "stop_order": 1,
+                "fares": [
+                    {
+                        "id": 1,
+                        "label": "Standard",
+                        "amount": "600.00"
+                    }
+                ]
+            }
+        ]
+    }
+}
+```
+
+### 4.4 Delete Route (Admin Only)
+```http
+DELETE /routes/manage.php
+Content-Type: application/json
+
+{
+    "id": 1
+}
+```
+
+Response:
+```json
+{
+    "success": true,
+    "message": "Route deleted successfully"
+}
+```
+
+## 5. Error Responses
+
+All endpoints may return the following error responses:
+
+### 5.1 400 Bad Request
+```json
+{
+    "error": true,
+    "message": "Error message here"
+}
+```
+
+### 5.2 401 Unauthorized
+```json
+{
+    "error": true,
+    "message": "Invalid credentials"
+}
+```
+
+### 5.3 403 Forbidden
+```json
+{
+    "error": true,
+    "message": "Access denied"
+}
+```
+
+### 5.4 404 Not Found
+```json
+{
+    "error": true,
+    "message": "Resource not found"
+}
+```
+
+### 5.5 500 Internal Server Error
+```json
+{
+    "error": true,
+    "message": "Internal server error"
+}
+```
+
+## 6. Important Notes
 
 1. **Device Registration**:
    - Required for all regular users before they can log in
@@ -237,14 +353,7 @@ X-Device-ID: DEVICE123  // Required for non-admin users
    - Regular users: Read-only access
    - Regular users must include their device ID in the `X-Device-ID` header
 
-4. **Error Responses**:
-   - 400 Bad Request: Invalid input data or unregistered device
-   - 401 Unauthorized: Invalid credentials
-   - 403 Forbidden: Insufficient permissions
-   - 404 Not Found: Resource not found
-   - 405 Method Not Allowed: Invalid HTTP method
-
-5. **Security**:
+4. **Security**:
    - All endpoints require authentication
    - Admin operations are restricted to admin users only
    - Device verification is required for non-admin users

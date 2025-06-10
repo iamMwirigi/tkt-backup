@@ -56,7 +56,9 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 }
 
 $data = json_decode(file_get_contents('php://input'), true);
-validateRequiredFields(['email', 'password', 'device_id'], $data);
+
+// First validate email and password for all users
+validateRequiredFields(['email', 'password'], $data);
 
 $db = new Database();
 $conn = $db->getConnection();
@@ -76,23 +78,30 @@ try {
         sendResponse(401, ['error' => 'Invalid credentials']);
     }
 
-    // Check if device exists
-    $stmt = $conn->prepare("SELECT id FROM devices WHERE device_uuid = ?");
-    $stmt->execute([$data['device_id']]);
-    $device = $stmt->fetch();
+    // For non-admin users, device_id is required
+    if ($user['role'] !== 'admin') {
+        if (!isset($data['device_id']) || empty($data['device_id'])) {
+            sendResponse(400, ['error' => 'Device ID is required for non-admin users']);
+        }
 
-    if (!$device) {
-        // Register new device
-        $stmt = $conn->prepare("
-            INSERT INTO devices (company_id, user_id, device_uuid, device_name) 
-            VALUES (?, ?, ?, ?)
-        ");
-        $stmt->execute([
-            $user['company_id'],
-            $user['id'],
-            $data['device_id'],
-            $_SERVER['HTTP_USER_AGENT'] ?? 'Unknown Device'
-        ]);
+        // Check if device exists
+        $stmt = $conn->prepare("SELECT id FROM devices WHERE device_uuid = ?");
+        $stmt->execute([$data['device_id']]);
+        $device = $stmt->fetch();
+
+        if (!$device) {
+            // Register new device
+            $stmt = $conn->prepare("
+                INSERT INTO devices (company_id, user_id, device_uuid, device_name) 
+                VALUES (?, ?, ?, ?)
+            ");
+            $stmt->execute([
+                $user['company_id'],
+                $user['id'],
+                $data['device_id'],
+                $_SERVER['HTTP_USER_AGENT'] ?? 'Unknown Device'
+            ]);
+        }
     }
 
     // Set session

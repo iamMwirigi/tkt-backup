@@ -449,3 +449,48 @@ You can create a ticket directly (walk-in) or convert an existing booking to a t
 >    - The seat must be available (unless override_seat is true)
 
 
+## 7. Routes
+
+### List Routes with Destinations and Fares
+- **Endpoint**: `GET /routes/list.php`
+- **Headers**:
+  - `Content-Type: application/json`
+  - `X-Device-ID: <device_id>`
+- **Response**:
+```json
+{
+    "success": true,
+    "message": "Routes retrieved successfully",
+    "data": {
+        "routes": [
+            {
+                "id": 1,
+                "company_id": 1,
+                "name": "Nairobi - Kisumu",
+                "description": "Main western route via Nakuru, Kericho",
+                "created_at": "2025-04-14 10:09:04",
+                "destination_count": 4,
+                "fare_count": 4,
+                "destinations": [
+                    {
+                        "id": 1,
+                        "route_id": 1,
+                        "name": "Naivasha",
+                        "stop_order": 1,
+                        "fare_count": 1,
+                        "fares": [
+                            {
+                                "id": 1,
+                                "destination_id": 1,
+                                "label": "Standard",
+                                "amount": "500.00",
+                                "created_at": "2025-04-14 10:09:04"
+                            }
+                        ]
+                    }
+                ]
+            }
+        ]
+    }
+}
+```

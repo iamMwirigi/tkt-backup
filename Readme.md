@@ -192,4 +192,260 @@ After logging in, you can retrieve a list of vehicles for your company. This end
 
 > **Note:** This endpoint requires authentication. If you're not logged in, you'll receive an "Unauthorized access" error.
 
+---
+
+## 5. Create Booking
+
+After creating a trip, you can create a booking for a specific seat. This endpoint requires an active session and the trip must exist.
+
+### Request
+
+- **Method:** `POST`
+- **URL:** `https://tkt-backup.onrender.com/bookings/create.php`
+- **Headers:**
+  ```json
+  {
+    "Content-Type": "application/json",
+    "X-Device-ID": "my-awesome-test-device-001"
+  }
+  ```
+  *(Ensure the session cookie from login is sent with this request)*
+
+- **Body (Raw JSON):**
+  ```json
+  {
+    "trip_id": 1,
+    "customer_name": "John Doe",
+    "customer_phone": "0712345678",
+    "destination_id": 1,
+    "seat_number": "1A",
+    "fare_amount": 1000,
+    "status": "booked"
+  }
+  ```
+
+### Required Fields:
+- `trip_id`: ID of the trip (from trip creation)
+- `customer_name`: Name of the customer
+- `customer_phone`: Phone number of the customer
+- `destination_id`: ID of the destination
+- `seat_number`: Seat number to book (e.g., "1A")
+- `fare_amount`: Amount to charge
+- `status`: (optional) Defaults to "booked"
+
+### Expected Response
+
+- **Status:** `201 Created`
+- **Body:**
+  ```json
+  {
+    "success": true,
+    "message": "Booking created successfully.",
+    "booking_id": 1
+  }
+  ```
+
+### Error Responses:
+
+1. **Unauthorized (401):**
+   ```json
+   {
+     "error": true,
+     "message": "Unauthorized. Please login."
+   }
+   ```
+
+2. **Seat Already Booked (409):**
+   ```json
+   {
+     "error": true,
+     "message": "Seat 1A is already booked for this trip."
+   }
+   ```
+
+3. **Invalid Fare Amount (400):**
+   ```json
+   {
+     "error": true,
+     "message": "Invalid fare amount."
+   }
+   ```
+
+> **Important Notes:**
+> 1. Make sure you're logged in first
+> 2. The trip must exist and belong to your company
+> 3. The seat must be available
+> 4. The destination must exist and belong to your company's route
+> 5. The fare amount must be a positive number
+
+## 6. Create Ticket
+
+You can create a ticket directly (walk-in) or convert an existing booking to a ticket. Both methods require an active session.
+
+### Direct Ticket Creation
+
+- **Method:** `POST`
+- **URL:** `https://tkt-backup.onrender.com/tickets/create.php`
+- **Headers:**
+  ```json
+  {
+    "Content-Type": "application/json",
+    "X-Device-ID": "my-awesome-test-device-001"
+  }
+  ```
+  *(Ensure the session cookie from login is sent with this request)*
+
+- **Body (Raw JSON):**
+  ```json
+  {
+    "trip_id": 1,
+    "destination_id": 1,
+    "seat_number": "1A",
+    "fare_amount": 1000,
+    "location": "Terminal",
+    "payment_method": "cash",
+    "transaction_id": null
+  }
+  ```
+
+### Required Fields:
+- `trip_id`: ID of the trip
+- `destination_id`: ID of the destination
+- `seat_number`: Seat number to book
+- `fare_amount`: Amount to charge
+
+### Optional Fields:
+- `location`: Where the ticket is being issued (defaults to "Terminal")
+- `payment_method`: Method of payment (defaults to "cash")
+- `transaction_id`: External payment reference (optional)
+
+### Expected Response
+
+- **Status:** `201 Created`
+- **Body:**
+  ```json
+  {
+    "success": true,
+    "message": "Ticket created successfully",
+    "ticket_id": 1
+  }
+  ```
+
+### Error Responses:
+
+1. **Unauthorized (401):**
+   ```json
+   {
+     "error": true,
+     "message": "Unauthorized. Please login."
+   }
+   ```
+
+2. **Seat Already Taken (400):**
+   ```json
+   {
+     "error": true,
+     "message": "Seat 1A is already taken for this trip"
+   }
+   ```
+
+3. **Invalid Destination (400):**
+   ```json
+   {
+     "error": true,
+     "message": "Invalid destination for this route"
+   }
+   ```
+
+### Convert Booking to Ticket
+
+- **Method:** `POST`
+- **URL:** `https://tkt-backup.onrender.com/tickets/convert-booking.php`
+- **Headers:**
+  ```json
+  {
+    "Content-Type": "application/json",
+    "X-Device-ID": "my-awesome-test-device-001"
+  }
+  ```
+  *(Ensure the session cookie from login is sent with this request)*
+
+- **Body (Raw JSON):**
+  ```json
+  {
+    "booking_id": 1,
+    "location": "Terminal",
+    "payment_method": "cash",
+    "transaction_id": null,
+    "override_seat": false
+  }
+  ```
+
+### Required Fields:
+- `booking_id`: ID of the booking to convert
+
+### Optional Fields:
+- `location`: Where the ticket is being issued (defaults to "Terminal")
+- `payment_method`: Method of payment (defaults to "cash")
+- `transaction_id`: External payment reference (optional)
+- `override_seat`: Set to true to force conversion even if seat is taken (defaults to false)
+
+### Expected Response
+
+- **Status:** `201 Created`
+- **Body:**
+  ```json
+  {
+    "success": true,
+    "message": "Booking converted to ticket successfully",
+    "ticket_id": 1
+  }
+  ```
+
+### Error Responses:
+
+1. **Unauthorized (401):**
+   ```json
+   {
+     "error": true,
+     "message": "Unauthorized. Please login."
+   }
+   ```
+
+2. **Booking Not Found (400):**
+   ```json
+   {
+     "error": true,
+     "message": "Booking not found or doesn't belong to your company"
+   }
+   ```
+
+3. **Already Converted (400):**
+   ```json
+   {
+     "error": true,
+     "message": "This booking has already been converted to a ticket"
+   }
+   ```
+
+4. **Seat Already Taken (400):**
+   ```json
+   {
+     "error": true,
+     "message": "Seat 1A is already taken for this trip. Use override_seat=true to force conversion."
+   }
+   ```
+
+> **Important Notes:**
+> 1. Make sure you're logged in first
+> 2. For direct ticket creation:
+>    - The trip must exist and belong to your company
+>    - The seat must be available
+>    - The destination must exist and belong to your company's route
+>    - The fare amount must be a positive number
+> 3. For booking conversion:
+>    - The booking must exist and belong to your company
+>    - The booking must not be already converted
+>    - The seat must be available (unless override_seat is true)
+
 

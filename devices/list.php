@@ -27,21 +27,10 @@ require_once __DIR__ . '/../utils/functions.php';
 
 header('Content-Type: application/json');
 
-// Check if user is logged in
-// $auth = checkAuth();
-// $user_id = $auth['user_id'];
-// $company_id = $auth['company_id'];
-// $user_role = $_SESSION['role'] ?? '';
-
-// Only admin users can view all devices
-/*
-if ($user_role !== 'admin') {
-    sendResponse(403, [
-        'error' => true,
-        'message' => 'Only admin users can view all devices'
-    ]);
-}
-*/
+// Use dummy values for testing
+$user_id = 1;
+$company_id = 1;
+$user_role = 'admin';
 
 try {
     $db = new Database();
@@ -50,12 +39,9 @@ try {
     // Get all devices for the company
     $stmt = $conn->prepare("
         SELECT 
-            d.id,
-            d.device_uuid,
-            d.device_name,
-            d.is_active,
-            d.registered_at,
-            u.name as registered_by
+            d.*,
+            u.name as user_name,
+            u.email as user_email
         FROM devices d
         LEFT JOIN users u ON d.user_id = u.id
         WHERE d.company_id = ?
@@ -64,20 +50,8 @@ try {
     $stmt->execute([$company_id]);
     $devices = $stmt->fetchAll(PDO::FETCH_ASSOC);
     
-    // Format the response
-    $formatted_devices = array_map(function($device) {
-        return [
-            'id' => $device['id'],
-            'device_id' => $device['device_uuid'],
-            'name' => $device['device_name'],
-            'status' => $device['is_active'] ? 'active' : 'inactive',
-            'registered_by' => $device['registered_by'],
-            'registered_at' => $device['registered_at']
-        ];
-    }, $devices);
-    
     sendResponse(200, [
-        'devices' => $formatted_devices
+        'devices' => $devices
     ]);
     
 } catch (Exception $e) {

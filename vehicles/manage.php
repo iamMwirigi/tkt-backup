@@ -42,7 +42,7 @@ try {
     switch ($_SERVER['REQUEST_METHOD']) {
         case 'POST':
             // Create new vehicle
-            validateRequiredFields(['plate_number', 'model', 'capacity'], $data);
+            validateRequiredFields(['plate_number', 'vehicle_type'], $data);
             
             // Check if plate number already exists
             $stmt = $conn->prepare("SELECT id FROM vehicles WHERE plate_number = ?");
@@ -55,15 +55,14 @@ try {
             }
             
             $stmt = $conn->prepare("
-                INSERT INTO vehicles (company_id, plate_number, model, capacity, status) 
-                VALUES (?, ?, ?, ?, ?)
+                INSERT INTO vehicles (company_id, plate_number, vehicle_type, owner_id) 
+                VALUES (?, ?, ?, ?)
             ");
             $stmt->execute([
                 $company_id,
                 $data['plate_number'],
-                $data['model'],
-                $data['capacity'],
-                $data['status'] ?? 'active'
+                $data['vehicle_type'],
+                $data['owner_id'] ?? null
             ]);
             
             sendResponse(201, [
@@ -103,17 +102,13 @@ try {
                 $updates[] = "plate_number = ?";
                 $params[] = $data['plate_number'];
             }
-            if (isset($data['model'])) {
-                $updates[] = "model = ?";
-                $params[] = $data['model'];
+            if (isset($data['vehicle_type'])) {
+                $updates[] = "vehicle_type = ?";
+                $params[] = $data['vehicle_type'];
             }
-            if (isset($data['capacity'])) {
-                $updates[] = "capacity = ?";
-                $params[] = $data['capacity'];
-            }
-            if (isset($data['status'])) {
-                $updates[] = "status = ?";
-                $params[] = $data['status'];
+            if (isset($data['owner_id'])) {
+                $updates[] = "owner_id = ?";
+                $params[] = $data['owner_id'];
             }
             
             if (empty($updates)) {

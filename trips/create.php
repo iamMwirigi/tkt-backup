@@ -75,8 +75,26 @@ try {
         throw new Exception("Route not found or doesn't belong to your company");
     }
 
+    // Get company prefix and route code
+    $stmt = $conn->prepare("
+        SELECT c.name as company_name, r.name as route_name 
+        FROM companies c 
+        JOIN routes r ON r.id = ? 
+        WHERE c.id = ?
+    ");
+    $stmt->execute([$data['route_id'], $company_id]);
+    $info = $stmt->fetch(PDO::FETCH_ASSOC);
+
+    if (!$info) {
+        throw new Exception("Could not get company or route information");
+    }
+
+    // Generate company prefix and route code
+    $company_prefix = substr(preg_replace('/[^A-Z]/', '', strtoupper($info['company_name'])), 0, 3);
+    $route_code = substr(preg_replace('/[^A-Z]/', '', strtoupper($info['route_name'])), 0, 3);
+
     // Generate trip code
-    $trip_code = generateTripCode('ZAW', 'NAI', $data['departure_time']);
+    $trip_code = generateTripCode($company_prefix, $route_code, $data['departure_time'], $conn);
 
     // Create trip
     $stmt = $conn->prepare("INSERT INTO trips (
@@ -103,7 +121,8 @@ try {
     echo json_encode([
         'success' => true,
         'message' => 'Trip created successfully',
-        'trip_id' => $trip_id
+        'trip_id' => $trip_id,
+        'trip_code' => $trip_code
     ]);
 
 } catch (Exception $e) {

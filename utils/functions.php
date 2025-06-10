@@ -258,18 +258,43 @@ function getValidDestinationOrFail($conn, $destination_id, $company_id) {
  * @param string $company_prefix Three-letter company code
  * @param string $route_code Three-letter route code
  * @param string $departure_time Departure time in Y-m-d H:i:s format
+ * @param PDO $conn Database connection object
  * @return string Generated trip code
  */
-function generateTripCode($company_prefix, $route_code, $departure_time) {
+function generateTripCode($company_prefix, $route_code, $departure_time, $conn) {
     // Convert departure time to date
     $date = new DateTime($departure_time);
+    $date_str = $date->format('Ymd');
     
-    // Format: COMPANY-ROUTE-YYYYMMDD
+    // Get the last trip code for today
+    $stmt = $conn->prepare("
+        SELECT trip_code 
+        FROM trips 
+        WHERE trip_code LIKE ? 
+        ORDER BY id DESC 
+        LIMIT 1
+    ");
+    $pattern = $company_prefix . '-' . $route_code . '-' . $date_str . '%';
+    $stmt->execute([$pattern]);
+    $last_trip = $stmt->fetch(PDO::FETCH_ASSOC);
+    
+    // Generate sequence number
+    $sequence = 1;
+    if ($last_trip) {
+        // Extract sequence from last trip code
+        $parts = explode('-', $last_trip['trip_code']);
+        if (count($parts) >= 4) {
+            $sequence = intval($parts[3]) + 1;
+        }
+    }
+    
+    // Format: COMPANY-ROUTE-YYYYMMDD-SEQ
     return sprintf(
-        '%s-%s-%s',
+        '%s-%s-%s-%d',
         $company_prefix,
         $route_code,
-        $date->format('Ymd')
+        $date_str,
+        $sequence
     );
 }
 

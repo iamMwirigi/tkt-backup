@@ -41,12 +41,6 @@ if ($user_role !== 'admin') {
     ]);
 }
 
-// Check device for non-admin users (though they shouldn't reach here)
-$device_id = checkDevice();
-if ($device_id && !verifyDevice($conn, $user_id, $device_id)) {
-    sendResponse(400, ['error' => true, 'message' => 'Invalid device']);
-}
-
 try {
     $db = new Database();
     $conn = $db->getConnection();

@@ -48,8 +48,8 @@ try {
     // Get all devices for the company
     $stmt = $conn->prepare("
         SELECT 
-            d.device_id as id,
-            d.device_name as name,
+            d.id,
+            d.device_name,
             d.location,
             d.status,
             d.last_seen,
@@ -67,7 +67,7 @@ try {
     $formatted_devices = array_map(function($device) {
         return [
             'id' => $device['id'],
-            'name' => $device['name'],
+            'name' => $device['device_name'],
             'location' => $device['location'],
             'status' => $device['status'],
             'last_seen' => $device['last_seen'],

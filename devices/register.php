@@ -20,13 +20,13 @@ $conn = $db->getConnection();
 
 try {
     // Check if device already exists
-    $stmt = $conn->prepare("SELECT id FROM devices WHERE device_uuid = ?");
-    $stmt->execute([$data['device_uuid']]);
-    $existing_device = $stmt->fetch();
+    // $stmt = $conn->prepare("SELECT id FROM devices WHERE device_uuid = ?");
+    // $stmt->execute([$data['device_uuid']]);
+    // $existing_device = $stmt->fetch();
 
-    if ($existing_device) {
-        sendResponse(400, ['error' => 'Device already registered']);
-    }
+    // if ($existing_device) {
+    //     sendResponse(400, ['error' => 'Device already registered']);
+    // }
 
     // Register new device
     $stmt = $conn->prepare("

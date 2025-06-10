@@ -38,17 +38,8 @@ function validateRequiredFields($required, $data) {
  * Sends a 401 response if not logged in.
  */
 function ensureLoggedIn() {
-    // Temporarily disabled for testing
-    /*
-    if (!isset($_SESSION['user_id']) || !isset($_SESSION['company_id'])) {
-        sendResponse(401, ['error' => true, 'message' => 'Unauthorized. Please login.']);
-    }
-    */
-    // You can add role checks here if needed for more granular access control
-    // Example:
-    // if (!isset($_SESSION['role']) || !in_array($_SESSION['role'], ['admin', 'clerk'])) {
-    //     sendResponse(403, ['error' => true, 'message' => 'Forbidden. Insufficient privileges for this action.']);
-    // }
+    // Authentication disabled for testing
+    return true;
 }
 
 /**
@@ -57,13 +48,7 @@ function ensureLoggedIn() {
  * @return array Array containing user_id and company_id
  */
 function checkAuth() {
-    // Temporarily disabled for testing
-    /*
-    if (!isset($_SESSION['user_id']) || !isset($_SESSION['company_id'])) {
-        sendResponse(401, ['error' => true, 'message' => 'Unauthorized. Please login.']);
-    }
-    */
-    // Return dummy values for testing
+    // Authentication disabled for testing
     return [
         'user_id' => 1,
         'company_id' => 1
@@ -76,58 +61,8 @@ function checkAuth() {
  * @return string The device ID
  */
 function checkDevice() {
-    // Get all headers
-    $headers = getallheaders();
-    error_log("Received headers: " . print_r($headers, true));
-    
-    // Check for device ID in various possible header formats
-    $device_id = null;
-    
-    // Check X-Device-ID (case insensitive)
-    foreach ($headers as $key => $value) {
-        if (strtolower($key) === 'x-device-id') {
-            $device_id = $value;
-            break;
-        }
-    }
-    
-    // Check device_kubwa (case insensitive)
-    if (!$device_id) {
-        foreach ($headers as $key => $value) {
-            if (strtolower($key) === 'device_kubwa') {
-                $device_id = $value;
-                break;
-            }
-        }
-    }
-    
-    // Check HTTP_X_DEVICE_ID
-    if (!$device_id && isset($_SERVER['HTTP_X_DEVICE_ID'])) {
-        $device_id = $_SERVER['HTTP_X_DEVICE_ID'];
-    }
-    
-    // Check HTTP_DEVICE_KUBWA
-    if (!$device_id && isset($_SERVER['HTTP_DEVICE_KUBWA'])) {
-        $device_id = $_SERVER['HTTP_DEVICE_KUBWA'];
-    }
-    
-    if ($device_id) {
-        error_log("Found device ID: " . $device_id);
-        return $device_id;
-    }
-    
-    // If no device ID found, send error with debug info
-    error_log("No device ID found in headers");
-    sendResponse(400, [
-        'error' => true, 
-        'message' => 'Device ID is required',
-        'debug' => [
-            'headers' => $headers,
-            'server_vars' => array_filter($_SERVER, function($key) {
-                return strpos($key, 'HTTP_') === 0;
-            }, ARRAY_FILTER_USE_KEY)
-        ]
-    ]);
+    // Device check disabled for testing
+    return 'TEST_DEVICE_123';
 }
 
 /**

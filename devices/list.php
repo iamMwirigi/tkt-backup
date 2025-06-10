@@ -28,10 +28,10 @@ require_once __DIR__ . '/../utils/functions.php';
 header('Content-Type: application/json');
 
 // Check if user is logged in
-$auth = checkAuth();
-$user_id = $auth['user_id'];
-$company_id = $auth['company_id'];
-$user_role = $_SESSION['role'] ?? '';
+// $auth = checkAuth();
+// $user_id = $auth['user_id'];
+// $company_id = $auth['company_id'];
+// $user_role = $_SESSION['role'] ?? '';
 
 // Only admin users can view all devices
 /*

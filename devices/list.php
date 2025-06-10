@@ -49,16 +49,15 @@ try {
     $stmt = $conn->prepare("
         SELECT 
             d.id,
+            d.device_uuid,
             d.device_name,
-            d.location,
-            d.status,
-            d.last_seen,
-            u.name as registered_by,
-            d.created_at
+            d.is_active,
+            d.registered_at,
+            u.name as registered_by
         FROM devices d
-        LEFT JOIN users u ON d.registered_by = u.id
+        LEFT JOIN users u ON d.user_id = u.id
         WHERE d.company_id = ?
-        ORDER BY d.created_at DESC
+        ORDER BY d.registered_at DESC
     ");
     $stmt->execute([$company_id]);
     $devices = $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -67,12 +66,11 @@ try {
     $formatted_devices = array_map(function($device) {
         return [
             'id' => $device['id'],
+            'device_id' => $device['device_uuid'],
             'name' => $device['device_name'],
-            'location' => $device['location'],
-            'status' => $device['status'],
-            'last_seen' => $device['last_seen'],
+            'status' => $device['is_active'] ? 'active' : 'inactive',
             'registered_by' => $device['registered_by'],
-            'created_at' => $device['created_at']
+            'registered_at' => $device['registered_at']
         ];
     }, $devices);
     

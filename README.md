@@ -18,7 +18,7 @@
 {
     "email": "officer@zawadi.co.ke",
     "password": "your_password",
-    "device_id": "my-awesome-test-device-001"  // Required for non-admin users
+    "device_id": "my-awesome-test-device-001"  
 }
 ```
 - **Response**:

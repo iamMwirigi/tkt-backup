@@ -74,6 +74,20 @@ try {
     $stmt->execute([$data['email']]);
     $user = $stmt->fetch();
 
+    // Add detailed debugging
+    error_log("Login attempt for email: " . $data['email']);
+    error_log("User found: " . ($user ? 'Yes' : 'No'));
+    if ($user) {
+        error_log("User role: " . $user['role']);
+        error_log("Stored password hash: " . $user['password']);
+        error_log("Attempting to verify password...");
+        $verify_result = password_verify($data['password'], $user['password']);
+        error_log("Password verification result: " . ($verify_result ? 'Success' : 'Failed'));
+        if (!$verify_result) {
+            error_log("Password verification failed. Input password: " . $data['password']);
+        }
+    }
+
     if (!$user || !password_verify($data['password'], $user['password'])) {
         sendResponse(401, ['error' => 'Invalid credentials']);
     }

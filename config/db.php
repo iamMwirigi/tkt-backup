@@ -10,11 +10,11 @@ class Database {
 
     public function __construct() {
         // Load from environment variables
-        $this->host = getenv('DB_HOST') ?: '127.0.0.1';
+        $this->host = getenv('DB_HOST') ?: 'db.igurudb.com';
         $this->port = getenv('DB_PORT') ?: '3306';
         $this->db_name = getenv('DB_NAME') ?: 'tkt';
-        $this->username = getenv('DB_USER') ?: 'root';
-        $this->password = getenv('DB_PASSWORD') ?: '';
+        $this->username = getenv('DB_USER') ?: 'dev_ops1';
+        $this->password = getenv('DB_PASSWORD') ?: 'a26N8Iv22TC4kJdb';
 
         $this->options = [
             PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,

@@ -104,6 +104,8 @@ try {
         }
     }
 
+    
+
     // Set session
     $_SESSION['user_id'] = $user['id'];
     $_SESSION['company_id'] = $user['company_id'];

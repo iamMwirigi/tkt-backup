@@ -28,28 +28,16 @@ require_once __DIR__ . '/../utils/functions.php';
 header('Content-Type: application/json');
 
 // Check if user is logged in
-if (!checkAuth()) {
-    http_response_code(401);
-    echo json_encode(['error' => true, 'message' => 'Unauthorized. Please login.']);
-    exit;
-}
-
-// Get user data from session
-$user = $_SESSION['user'];
-$company_id = $user['company_id'];
+$auth = checkAuth();
+$user_id = $auth['user_id'];
+$company_id = $auth['company_id'];
 
 // Get request body
 $data = json_decode(file_get_contents('php://input'), true);
 
 // Validate required fields
 $required_fields = ['trip_id', 'destination_id', 'seat_number', 'fare_amount'];
-foreach ($required_fields as $field) {
-    if (!isset($data[$field]) || empty($data[$field])) {
-        http_response_code(400);
-        echo json_encode(['error' => true, 'message' => "Missing required field: $field"]);
-        exit;
-    }
-}
+validateRequiredFields($required_fields, $data);
 
 try {
     $db = new Database();
@@ -58,40 +46,15 @@ try {
     // Start transaction
     $conn->beginTransaction();
 
-    // Get trip details
-    $trip_id = $data['trip_id'];
-    $stmt = $conn->prepare("SELECT t.*, v.plate_number, r.name as route_name 
-                           FROM trips t 
-                           JOIN vehicles v ON t.vehicle_id = v.id 
-                           JOIN routes r ON t.route_id = r.id 
-                           WHERE t.id = ? AND t.company_id = ?");
-    $stmt->execute([$trip_id, $company_id]);
-    $trip = $stmt->fetch(PDO::FETCH_ASSOC);
-
-    if (!$trip) {
-        throw new Exception("Trip not found or doesn't belong to your company");
-    }
-
-    // Check if seat is available
-    $seat_number = $data['seat_number'];
-    $stmt = $conn->prepare("SELECT COUNT(*) as count FROM tickets 
-                           WHERE trip_id = ? AND seat_number = ?");
-    $stmt->execute([$trip_id, $seat_number]);
-    $seat_check = $stmt->fetch(PDO::FETCH_ASSOC);
-
-    if ($seat_check['count'] > 0) {
-        throw new Exception("Seat $seat_number is already taken for this trip");
-    }
-
+    // Validate trip
+    $trip = getValidTripOrFail($conn, $data['trip_id'], $company_id);
+    
     // Validate destination
-    $destination_id = $data['destination_id'];
-    $stmt = $conn->prepare("SELECT * FROM destinations 
-                           WHERE id = ? AND route_id = ?");
-    $stmt->execute([$destination_id, $trip['route_id']]);
-    $destination = $stmt->fetch(PDO::FETCH_ASSOC);
-
-    if (!$destination) {
-        throw new Exception("Invalid destination for this route");
+    $destination = getValidDestinationOrFail($conn, $data['destination_id'], $company_id);
+    
+    // Check if seat is available
+    if (!isSeatAvailable($conn, $data['trip_id'], $trip['vehicle_id'], $data['seat_number'], $company_id)) {
+        throw new Exception("Seat {$data['seat_number']} is already taken for this trip");
     }
 
     // Create ticket
@@ -104,10 +67,10 @@ try {
     $stmt->execute([
         $company_id,
         $trip['vehicle_id'],
-        $trip_id,
-        $user['id'],
-        $destination_id,
-        $trip['route_name'],
+        $data['trip_id'],
+        $user_id,
+        $data['destination_id'],
+        $destination['destination_name'],
         $location
     ]);
     $ticket_id = $conn->lastInsertId();
@@ -126,7 +89,7 @@ try {
         $data['fare_amount'],
         $payment_method,
         $transaction_id,
-        $user['id']
+        $user_id
     ]);
 
     // Commit transaction

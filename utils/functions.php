@@ -51,13 +51,16 @@ function ensureLoggedIn() {
 /**
  * Checks if user is authenticated and returns user_id.
  * Sends a 401 response if not authenticated.
- * @return int The authenticated user's ID
+ * @return array Array containing user_id and company_id
  */
 function checkAuth() {
-    if (!isset($_SESSION['user_id'])) {
+    if (!isset($_SESSION['user_id']) || !isset($_SESSION['company_id'])) {
         sendResponse(401, ['error' => true, 'message' => 'Unauthorized. Please login.']);
     }
-    return $_SESSION['user_id'];
+    return [
+        'user_id' => $_SESSION['user_id'],
+        'company_id' => $_SESSION['company_id']
+    ];
 }
 
 /**

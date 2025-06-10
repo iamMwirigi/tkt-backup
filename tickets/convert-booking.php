@@ -28,15 +28,9 @@ require_once __DIR__ . '/../utils/functions.php';
 header('Content-Type: application/json');
 
 // Check if user is logged in
-if (!checkAuth()) {
-    http_response_code(401);
-    echo json_encode(['error' => true, 'message' => 'Unauthorized. Please login.']);
-    exit;
-}
-
-// Get user data from session
-$user = $_SESSION['user'];
-$company_id = $user['company_id'];
+$auth = checkAuth();
+$user_id = $auth['user_id'];
+$company_id = $auth['company_id'];
 
 // Get request body
 $data = json_decode(file_get_contents('php://input'), true);
@@ -96,7 +90,7 @@ try {
         $company_id,
         $booking['vehicle_id'],
         $booking['trip_id'],
-        $user['id'],
+        $user_id,
         $booking['destination_id'],
         $booking_id,
         $booking['route_name'],
@@ -118,7 +112,7 @@ try {
         $booking['fare_amount'],
         $payment_method,
         $transaction_id,
-        $user['id']
+        $user_id
     ]);
 
     // Update booking status

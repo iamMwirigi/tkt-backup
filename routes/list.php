@@ -31,19 +31,22 @@ header('Content-Type: application/json');
 $auth = checkAuth();
 $user_id = $auth['user_id'];
 $company_id = $auth['company_id'];
+$user_role = $_SESSION['role'] ?? '';
 
-// Check device
-$device_id = checkDevice();
-if (!$device_id) {
-    sendResponse(400, ['error' => true, 'message' => 'Device ID is required']);
+// For non-admin users, device ID is required
+if ($user_role !== 'admin') {
+    $device_id = checkDevice();
+    if (!$device_id) {
+        sendResponse(400, ['error' => true, 'message' => 'Device ID is required for non-admin users']);
+    }
 }
 
 try {
     $db = new Database();
     $conn = $db->getConnection();
 
-    // Verify device
-    if (!verifyDevice($conn, $user_id, $device_id)) {
+    // Verify device for non-admin users
+    if ($user_role !== 'admin' && !verifyDevice($conn, $user_id, $device_id)) {
         sendResponse(400, ['error' => true, 'message' => 'Invalid device']);
     }
 
@@ -102,8 +105,7 @@ try {
     ]);
 
 } catch (Exception $e) {
-    http_response_code(400);
-    echo json_encode([
+    sendResponse(400, [
         'error' => true,
         'message' => $e->getMessage()
     ]);

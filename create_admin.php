@@ -20,8 +20,8 @@ try {
 
     // First ensure company exists
     $stmt = $conn->prepare("
-        INSERT INTO companies (name) 
-        SELECT 'Zawadi Express' 
+        INSERT INTO companies (name, email) 
+        SELECT 'Zawadi Express', 'admin@zawadi.co.ke'
         WHERE NOT EXISTS (SELECT 1 FROM companies WHERE name = 'Zawadi Express')
     ");
     $stmt->execute();
@@ -56,6 +56,15 @@ try {
         echo "Email: admin@zawadi.co.ke\n";
         echo "Password: admin123\n";
         echo "Generated hash: " . $hashed_password . "\n";
+        
+        // Verify the user was created with admin role
+        $stmt = $conn->prepare("SELECT * FROM users WHERE email = 'admin@zawadi.co.ke'");
+        $stmt->execute();
+        $user = $stmt->fetch();
+        echo "\nVerification:\n";
+        echo "User ID: " . $user['id'] . "\n";
+        echo "Role: " . $user['role'] . "\n";
+        echo "Company ID: " . $user['company_id'] . "\n";
     } else {
         echo "Failed to create admin user\n";
     }

@@ -1,265 +1,251 @@
-# TKT Backup API Documentation
+# TKT API Documentation
+
+## Device Management (Required for Regular Users)
+
+### 1. Register Device (Required First Step for Regular Users)
+```http
+POST /devices/register.php
+Content-Type: application/json
+
+{
+    "device_id": "DEVICE123",
+    "device_name": "POS Terminal 1",
+    "location": "Nairobi Branch"
+}
+```
+**Response (201 Created):**
+```json
+{
+    "success": true,
+    "message": "Device registered successfully",
+    "device_id": "DEVICE123"
+}
+```
+
+### 2. List Devices
+```http
+GET /devices/list.php
+```
+**Response (200 OK):**
+```json
+{
+    "devices": [
+        {
+            "id": "DEVICE123",
+            "name": "POS Terminal 1",
+            "location": "Nairobi Branch",
+            "status": "active",
+            "last_seen": "2024-03-20 10:30:00"
+        }
+    ]
+}
+```
 
 ## Authentication
 
-### Login
-- **Endpoint**: `POST /auth/login.php`
-- **Headers**:
-  - `Content-Type: application/json`
-- **Body**:
-```json
-// For Admin Users:
+### 1. Login as Admin
+```http
+POST /auth/login.php
+Content-Type: application/json
+
 {
     "email": "admin@zawadi.co.ke",
-    "password": "your_password"
-}
-
-// For Non-Admin Users (Officers, Clerks):
-{
-    "email": "officer@zawadi.co.ke",
-    "password": "your_password",
-    "device_id": "my-awesome-test-device-001"  
+    "password": "admin123"
 }
 ```
-- **Response**:
+**Response (200 OK):**
 ```json
 {
-    "success": true,
     "message": "Login successful",
     "user": {
-        "id": 1,
+        "id": 7,
         "name": "Admin User",
         "email": "admin@zawadi.co.ke",
         "role": "admin",
-        "company": "Zawadi Co. Ltd"
+        "company": "Zawadi Express"
     }
 }
 ```
 
-## Routes
+### 2. Login as Regular User (After Device Registration)
+```http
+POST /auth/login.php
+Content-Type: application/json
 
-### List Routes with Destinations and Fares
-- **Endpoint**: `GET /routes/list.php`
-- **Headers**:
-  - `Content-Type: application/json`
-  - `X-Device-ID: <device_id>` (Required for non-admin users only)
-- **Response**:
+{
+    "email": "user@zawadi.co.ke",
+    "password": "user123",
+    "device_id": "DEVICE123"  // Must be a registered device
+}
+```
+**Response (200 OK):**
 ```json
 {
-    "success": true,
-    "message": "Routes retrieved successfully",
-    "data": {
-        "routes": [
-            {
-                "id": 1,
-                "company_id": 1,
-                "name": "Nairobi - Kisumu",
-                "description": "Main western route via Nakuru, Kericho",
-                "created_at": "2025-04-14 10:09:04",
-                "destination_count": 4,
-                "fare_count": 4,
-                "destinations": [
-                    {
-                        "id": 1,
-                        "route_id": 1,
-                        "name": "Naivasha",
-                        "stop_order": 1,
-                        "fare_count": 1,
-                        "fares": [
-                            {
-                                "id": 1,
-                                "destination_id": 1,
-                                "label": "Standard",
-                                "amount": "500.00",
-                                "created_at": "2025-04-14 10:09:04"
-                            }
-                        ]
-                    }
-                ]
-            }
-        ]
+    "message": "Login successful",
+    "user": {
+        "id": 8,
+        "name": "Regular User",
+        "email": "user@zawadi.co.ke",
+        "role": "user",
+        "company": "Zawadi Express"
     }
 }
 ```
 
-## Trips
+## Routes Management
 
-### Create Trip
-- **Endpoint**: `POST /trips/create.php`
-- **Headers**:
-  - `Content-Type: application/json`
-  - `X-Device-ID: <device_id>` (Required for non-admin users only)
-- **Body**:
-```json
+### 1. Create Route (Admin Only)
+```http
+POST /routes/manage.php
+Content-Type: application/json
+
 {
-    "vehicle_id": 1,
-    "route_id": 1,
-    "driver_name": "John Driver",
-    "conductor_name": "Mike Conductor",
-    "departure_time": "2025-06-10 10:00:00"
+    "name": "Nairobi - Mombasa",
+    "description": "Main route between Nairobi and Mombasa",
+    "destinations": [
+        {
+            "name": "Nairobi",
+            "stop_order": 1,
+            "fares": [
+                {
+                    "label": "Adult",
+                    "amount": 1500
+                },
+                {
+                    "label": "Child",
+                    "amount": 750
+                }
+            ]
+        },
+        {
+            "name": "Mombasa",
+            "stop_order": 2,
+            "fares": [
+                {
+                    "label": "Adult",
+                    "amount": 1500
+                },
+                {
+                    "label": "Child",
+                    "amount": 750
+                }
+            ]
+        }
+    ]
 }
 ```
-- **Response**:
-```json
-{
-    "success": true,
-    "message": "Trip created successfully",
-    "trip_id": 1,
-    "trip_code": "ZAW-NAI-20250610-1"
-}
-```
-
-## Tickets
-
-### Create Ticket
-- **Endpoint**: `POST /tickets/create.php`
-- **Headers**:
-  - `Content-Type: application/json`
-  - `X-Device-ID: <device_id>` (Required for non-admin users only)
-- **Body**:
-```json
-{
-    "trip_id": 1,
-    "destination_id": 1,
-    "seat_number": "4A",
-    "fare_amount": 1000,
-    "location": "Terminal",
-    "payment_method": "cash",
-    "transaction_id": null
-}
-```
-- **Response**:
+**Response (201 Created):**
 ```json
 {
     "success": true,
-    "message": "Ticket created successfully",
-    "ticket_id": 1
+    "message": "Route created successfully",
+    "route_id": 1
 }
 ```
 
-### Convert Booking to Ticket
-- **Endpoint**: `POST /tickets/convert-booking.php`
-- **Headers**:
-  - `Content-Type: application/json`
-  - `X-Device-ID: <device_id>` (Required for non-admin users only)
-- **Body**:
+### 2. View Routes (All Users)
+```http
+GET /routes/list.php
+X-Device-ID: DEVICE123  // Required for non-admin users
+```
+**Response (200 OK):**
 ```json
 {
-    "booking_id": 1,
-    "location": "Terminal",
-    "payment_method": "cash",
-    "transaction_id": null,
-    "override_seat": false
-}
-```
-- **Response**:
-```json
-{
-    "success": true,
-    "message": "Booking converted to ticket successfully",
-    "ticket_id": 1
-}
-```
-
-## Bookings
-
-### Create Booking
-- **Endpoint**: `POST /bookings/create.php`
-- **Headers**:
-  - `Content-Type: application/json`
-  - `X-Device-ID: <device_id>` (Required for non-admin users only)
-- **Body**:
-```json
-{
-    "trip_id": 1,
-    "customer_name": "John Doe",
-    "customer_phone": "0712345678",
-    "destination_id": 1,
-    "seat_number": "1A",
-    "fare_amount": 1000,
-    "status": "booked"
-}
-```
-- **Response**:
-```json
-{
-    "success": true,
-    "message": "Booking created successfully",
-    "booking_id": 1
-}
-```
-
-## Error Responses
-
-All endpoints may return the following error responses:
-
-### Unauthorized (401)
-```json
-{
-    "error": true,
-    "message": "Unauthorized. Please login."
+    "routes": [
+        {
+            "id": 1,
+            "name": "Nairobi - Mombasa",
+            "description": "Main route between Nairobi and Mombasa",
+            "destinations": [
+                {
+                    "id": 1,
+                    "name": "Nairobi",
+                    "stop_order": 1,
+                    "fares": [
+                        {
+                            "id": 1,
+                            "label": "Adult",
+                            "amount": 1500
+                        },
+                        {
+                            "id": 2,
+                            "label": "Child",
+                            "amount": 750
+                        }
+                    ]
+                },
+                {
+                    "id": 2,
+                    "name": "Mombasa",
+                    "stop_order": 2,
+                    "fares": [
+                        {
+                            "id": 3,
+                            "label": "Adult",
+                            "amount": 1500
+                        },
+                        {
+                            "id": 4,
+                            "label": "Child",
+                            "amount": 750
+                        }
+                    ]
+                }
+            ]
+        }
+    ]
 }
 ```
 
-### Bad Request (400)
-```json
-{
-    "error": true,
-    "message": "Missing required field: field_name"
-}
-```
+## User Flow
 
-### Device ID Required (400)
-```json
-{
-    "error": true,
-    "message": "Device ID is required",
-    "debug": {
-        "headers": {...},
-        "server_vars": {...}
-    }
-}
-```
+### Regular User Flow:
+1. **First Time Setup**:
+   - Register device using `/devices/register.php`
+   - Save the `device_id` for future use
 
-## Notes
+2. **Daily Usage**:
+   - Login with email, password, and registered `device_id`
+   - Include `device_id` in `X-Device-ID` header for all API calls
+   - Can only view routes, no modification permissions
 
-1. All endpoints require authentication. Make sure to login first and include the session cookie in subsequent requests.
-2. Device ID requirements are role-based:
-   - Admin users (`role: "admin"`) do not need to provide a device ID
-   - Non-admin users (`role: "officer"` or `role: "clerk"`) must provide a device ID in either:
-     - `X-Device-ID` header
-     - `device_kubwa` header
-3. All timestamps are in UTC format (YYYY-MM-DD HH:mm:ss)
-4. All monetary values are in the local currency (KES)
-5. Seat numbers should be in the format "number+letter" (e.g., "1A", "2B", etc.)
-6. Routes are ordered by name, destinations by stop_order, and fares by amount
-7. Each route includes:
-   - Basic route information
-   - Count of destinations and fares
-   - List of destinations with their fares
-8. Each destination includes:
-   - Basic destination information
-   - Count of available fares
-   - List of fares with their amounts
+### Admin User Flow:
+1. **Login**:
+   - Login with email and password only
+   - No device registration required
 
-## User Roles
+2. **Daily Usage**:
+   - Full access to all API endpoints
+   - Can create, update, and delete routes
+   - Can view all routes without device ID
 
-The system supports three user roles:
+## Important Notes
 
-1. **Admin** (`role: "admin"`)
-   - Full system access
-   - No device ID required
-   - Can manage all company data
-   - Example: `admin@zawadi.co.ke`
+1. **Device Registration**:
+   - Required for all regular users before they can log in
+   - Device ID must be unique
+   - Device registration is a one-time process
+   - Keep the device ID secure as it's required for all operations
 
-2. **Officer** (`role: "officer"`)
-   - Limited system access
-   - Device ID required
-   - Can manage tickets and bookings
-   - Example: `officer@zawadi.co.ke`
+2. **Authentication**:
+   - Admin users: Login with email and password only
+   - Regular users: Must login with email, password, and registered device ID
+   - All requests must include the session cookie from login
 
-3. **Clerk** (`role: "clerk"`)
-   - Basic system access
-   - Device ID required
-   - Can create bookings and tickets
-   - Example: `clerk@zawadi.co.ke` 
+3. **Routes Management**:
+   - Admin users: Full CRUD operations
+   - Regular users: Read-only access
+   - Regular users must include their device ID in the `X-Device-ID` header
+
+4. **Error Responses**:
+   - 400 Bad Request: Invalid input data or unregistered device
+   - 401 Unauthorized: Invalid credentials
+   - 403 Forbidden: Insufficient permissions
+   - 404 Not Found: Resource not found
+   - 405 Method Not Allowed: Invalid HTTP method
+
+5. **Security**:
+   - All endpoints require authentication
+   - Admin operations are restricted to admin users only
+   - Device verification is required for non-admin users
+   - Session management is handled automatically

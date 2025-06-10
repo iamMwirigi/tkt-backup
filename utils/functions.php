@@ -76,20 +76,31 @@ function checkDevice() {
     // Check for device ID in various possible header formats
     $device_id = null;
     
-    // Check X-Device-ID
-    if (isset($headers['X-Device-ID'])) {
-        $device_id = $headers['X-Device-ID'];
+    // Check X-Device-ID (case insensitive)
+    foreach ($headers as $key => $value) {
+        if (strtolower($key) === 'x-device-id') {
+            $device_id = $value;
+            break;
+        }
     }
-    // Check device_kubwa
-    else if (isset($headers['device_kubwa'])) {
-        $device_id = $headers['device_kubwa'];
+    
+    // Check device_kubwa (case insensitive)
+    if (!$device_id) {
+        foreach ($headers as $key => $value) {
+            if (strtolower($key) === 'device_kubwa') {
+                $device_id = $value;
+                break;
+            }
+        }
     }
+    
     // Check HTTP_X_DEVICE_ID
-    else if (isset($_SERVER['HTTP_X_DEVICE_ID'])) {
+    if (!$device_id && isset($_SERVER['HTTP_X_DEVICE_ID'])) {
         $device_id = $_SERVER['HTTP_X_DEVICE_ID'];
     }
+    
     // Check HTTP_DEVICE_KUBWA
-    else if (isset($_SERVER['HTTP_DEVICE_KUBWA'])) {
+    if (!$device_id && isset($_SERVER['HTTP_DEVICE_KUBWA'])) {
         $device_id = $_SERVER['HTTP_DEVICE_KUBWA'];
     }
     

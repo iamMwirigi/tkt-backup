@@ -42,7 +42,7 @@ try {
     switch ($_SERVER['REQUEST_METHOD']) {
         case 'POST':
             // Create new vehicle
-            validateRequiredFields(['plate_number', 'vehicle_type', 'seats'], $data);
+            validateRequiredFields(['plate_number', 'vehicle_type'], $data);
             
             // Validate plate number format (e.g., KBR 123A)
             if (!preg_match('/^[A-Z]{3}\s\d{3}[A-Z]$/', $data['plate_number'])) {
@@ -71,14 +71,6 @@ try {
                 ]);
             }
             
-            // Validate seats
-            if (!is_numeric($data['seats']) || $data['seats'] < 1) {
-                sendResponse(400, [
-                    'error' => true,
-                    'message' => 'Invalid number of seats'
-                ]);
-            }
-            
             // Start transaction
             $conn->beginTransaction();
             
@@ -86,14 +78,13 @@ try {
                 // Create vehicle
                 $stmt = $conn->prepare("
                     INSERT INTO vehicles (
-                        plate_number, vehicle_type, seats, company_id, created_by
-                    ) VALUES (?, ?, ?, ?, ?)
+                        plate_number, vehicle_type, company_id, created_by
+                    ) VALUES (?, ?, ?, ?)
                 ");
                 
                 $stmt->execute([
                     $data['plate_number'],
                     $data['vehicle_type'],
-                    $data['seats'],
                     $company_id,
                     $user_id
                 ]);
@@ -174,8 +165,7 @@ try {
                 
                 $allowed_fields = [
                     'plate_number',
-                    'vehicle_type',
-                    'seats'
+                    'vehicle_type'
                 ];
                 
                 foreach ($allowed_fields as $field) {
@@ -202,13 +192,6 @@ try {
                             $allowed_types = ['Bus', 'Van', 'Car', 'Truck'];
                             if (!in_array($data['vehicle_type'], $allowed_types)) {
                                 throw new Exception('Invalid vehicle type. Allowed types: ' . implode(', ', $allowed_types));
-                            }
-                        }
-                        
-                        // Validate seats if being updated
-                        if ($field === 'seats') {
-                            if (!is_numeric($data['seats']) || $data['seats'] < 1) {
-                                throw new Exception('Invalid number of seats');
                             }
                         }
                         

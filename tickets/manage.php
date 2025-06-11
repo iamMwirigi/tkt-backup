@@ -175,6 +175,19 @@ try {
             
             foreach ($allowedFields as $field) {
                 if (isset($data[$field])) {
+                    // For vehicle_id, trip_id, officer_id, and destination_id, verify they exist
+                    if (in_array($field, ['vehicle_id', 'trip_id', 'officer_id', 'destination_id'])) {
+                        $table = $field === 'officer_id' ? 'users' : ($field === 'destination_id' ? 'destinations' : $field . 's');
+                        $stmt = $conn->prepare("SELECT id FROM $table WHERE id = ?" . ($field !== 'destination_id' ? " AND company_id = ?" : ""));
+                        $stmt->execute($field === 'destination_id' ? [$data[$field]] : [$data[$field], $company_id]);
+                        if (!$stmt->fetch()) {
+                            sendResponse(404, [
+                                'error' => true,
+                                'message' => ucfirst(str_replace('_', ' ', $field)) . ' not found or does not belong to your company'
+                            ]);
+                        }
+                    }
+                    
                     $updateFields[] = "$field = ?";
                     $params[] = $data[$field];
                 }

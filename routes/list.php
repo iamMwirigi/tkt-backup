@@ -62,11 +62,9 @@ try {
     // Get all routes for the company
     $stmt = $conn->prepare("
         SELECT r.*, 
-               COUNT(DISTINCT d.id) as destination_count,
-               COUNT(DISTINCT f.id) as fare_count
+               COUNT(DISTINCT d.id) as destination_count
         FROM routes r
         LEFT JOIN destinations d ON r.id = d.route_id
-        LEFT JOIN fares f ON d.id = f.destination_id
         WHERE r.company_id = ?
         GROUP BY r.id
         ORDER BY r.name ASC
@@ -74,38 +72,7 @@ try {
     $stmt->execute([$company_id]);
     $routes = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-    // For each route, get its destinations and fares
-    foreach ($routes as &$route) {
-        // Get destinations
-        $stmt = $conn->prepare("
-            SELECT d.*, 
-                   COUNT(f.id) as fare_count
-            FROM destinations d
-            LEFT JOIN fares f ON d.id = f.destination_id
-            WHERE d.route_id = ?
-            GROUP BY d.id
-            ORDER BY d.stop_order ASC
-        ");
-        $stmt->execute([$route['id']]);
-        $destinations = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-        // For each destination, get its fares
-        foreach ($destinations as &$destination) {
-            $stmt = $conn->prepare("
-                SELECT f.*
-                FROM fares f
-                WHERE f.destination_id = ?
-                ORDER BY f.amount ASC
-            ");
-            $stmt->execute([$destination['id']]);
-            $destination['fares'] = $stmt->fetchAll(PDO::FETCH_ASSOC);
-        }
-
-        $route['destinations'] = $destinations;
-    }
-
-    // Return success response
-    echo json_encode([
+    sendResponse(200, [
         'success' => true,
         'message' => 'Routes retrieved successfully',
         'data' => [

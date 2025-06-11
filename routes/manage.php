@@ -73,42 +73,16 @@ try {
             
             $route_id = $conn->lastInsertId();
             
-            // If destinations are provided, create them
-            if (isset($data['destinations']) && is_array($data['destinations'])) {
-                foreach ($data['destinations'] as $index => $destination) {
-                    $stmt = $conn->prepare("
-                        INSERT INTO destinations (route_id, name, stop_order) 
-                        VALUES (?, ?, ?)
-                    ");
-                    $stmt->execute([
-                        $route_id,
-                        $destination['name'],
-                        $destination['stop_order'] ?? ($index + 1)
-                    ]);
-                    
-                    $destination_id = $conn->lastInsertId();
-                    
-                    // If fares are provided for this destination, create them
-                    if (isset($destination['fares']) && is_array($destination['fares'])) {
-                        foreach ($destination['fares'] as $fare) {
-                            $stmt = $conn->prepare("
-                                INSERT INTO fares (destination_id, label, amount) 
-                                VALUES (?, ?, ?)
-                            ");
-                            $stmt->execute([
-                                $destination_id,
-                                $fare['label'],
-                                $fare['amount']
-                            ]);
-                        }
-                    }
-                }
-            }
-            
             sendResponse(201, [
                 'success' => true,
                 'message' => 'Route created successfully',
-                'route_id' => $route_id
+                'route' => [
+                    'id' => $route_id,
+                    'name' => $data['name'],
+                    'description' => $data['description'] ?? null,
+                    'company_id' => $company_id,
+                    'created_at' => date('Y-m-d H:i:s')
+                ]
             ]);
             break;
             
@@ -137,72 +111,6 @@ try {
                 $data['id'],
                 $company_id
             ]);
-            
-            // Update destinations if provided
-            if (isset($data['destinations']) && is_array($data['destinations'])) {
-                // Get existing destinations
-                $stmt = $conn->prepare("SELECT id, name FROM destinations WHERE route_id = ?");
-                $stmt->execute([$data['id']]);
-                $existing_destinations = $stmt->fetchAll(PDO::FETCH_ASSOC);
-                
-                // Update or create destinations
-                foreach ($data['destinations'] as $index => $destination) {
-                    // Check if destination exists
-                    $existing_destination = null;
-                    foreach ($existing_destinations as $ed) {
-                        if ($ed['name'] === $destination['name']) {
-                            $existing_destination = $ed;
-                            break;
-                        }
-                    }
-                    
-                    if ($existing_destination) {
-                        // Update existing destination
-                        $stmt = $conn->prepare("
-                            UPDATE destinations 
-                            SET stop_order = ? 
-                            WHERE id = ?
-                        ");
-                        $stmt->execute([
-                            $destination['stop_order'] ?? ($index + 1),
-                            $existing_destination['id']
-                        ]);
-                        $destination_id = $existing_destination['id'];
-                    } else {
-                        // Create new destination
-                        $stmt = $conn->prepare("
-                            INSERT INTO destinations (route_id, name, stop_order) 
-                            VALUES (?, ?, ?)
-                        ");
-                        $stmt->execute([
-                            $data['id'],
-                            $destination['name'],
-                            $destination['stop_order'] ?? ($index + 1)
-                        ]);
-                        $destination_id = $conn->lastInsertId();
-                    }
-                    
-                    // Update fares if provided
-                    if (isset($destination['fares']) && is_array($destination['fares'])) {
-                        // Delete existing fares for this destination
-                        $stmt = $conn->prepare("DELETE FROM fares WHERE destination_id = ?");
-                        $stmt->execute([$destination_id]);
-                        
-                        // Create new fares
-                        foreach ($destination['fares'] as $fare) {
-                            $stmt = $conn->prepare("
-                                INSERT INTO fares (destination_id, label, amount) 
-                                VALUES (?, ?, ?)
-                            ");
-                            $stmt->execute([
-                                $destination_id,
-                                $fare['label'],
-                                $fare['amount']
-                            ]);
-                        }
-                    }
-                }
-            }
             
             sendResponse(200, [
                 'success' => true,

@@ -41,7 +41,7 @@ try {
         SELECT 
             v.*,
             vo.name as owner_name,
-            vo.phone_number as owner_phone,
+            vo.phone as owner_phone,
             (
                 SELECT COUNT(*) 
                 FROM trips t 

@@ -53,7 +53,7 @@ try {
             }
             
             // Check if phone number already exists
-            $stmt = $conn->prepare("SELECT id FROM vehicle_owners WHERE phone_number = ? AND company_id = ?");
+            $stmt = $conn->prepare("SELECT id FROM vehicle_owners WHERE phone = ? AND company_id = ?");
             $stmt->execute([$data['phone_number'], $company_id]);
             if ($stmt->fetch()) {
                 sendResponse(400, [
@@ -69,15 +69,14 @@ try {
                 // Create owner
                 $stmt = $conn->prepare("
                     INSERT INTO vehicle_owners (
-                        name, phone_number, company_id, created_by
-                    ) VALUES (?, ?, ?, ?)
+                        name, phone, company_id
+                    ) VALUES (?, ?, ?)
                 ");
                 
                 $stmt->execute([
                     $data['name'],
                     $data['phone_number'],
-                    $company_id,
-                    $user_id
+                    $company_id
                 ]);
                 
                 $owner_id = $conn->lastInsertId();
@@ -116,17 +115,15 @@ try {
                     // Create vehicle
                     $stmt = $conn->prepare("
                         INSERT INTO vehicles (
-                            plate_number, vehicle_type, seats, company_id, owner_id, created_by
-                        ) VALUES (?, ?, ?, ?, ?, ?)
+                            plate_number, vehicle_type, company_id, owner_id
+                        ) VALUES (?, ?, ?, ?)
                     ");
                     
                     $stmt->execute([
                         $vehicle['plate_number'],
                         $vehicle['vehicle_type'],
-                        $vehicle['seats'],
                         $company_id,
-                        $owner_id,
-                        $user_id
+                        $owner_id
                     ]);
                     
                     $vehicle_id = $conn->lastInsertId();
@@ -147,7 +144,6 @@ try {
                                 'id', v.id,
                                 'plate_number', v.plate_number,
                                 'vehicle_type', v.vehicle_type,
-                                'seats', v.seats,
                                 'created_at', v.created_at
                             )
                         ) as vehicles
@@ -193,8 +189,8 @@ try {
             }
             
             // Check if new phone number already exists
-            if (isset($data['phone_number']) && $data['phone_number'] !== $owner['phone_number']) {
-                $stmt = $conn->prepare("SELECT id FROM vehicle_owners WHERE phone_number = ? AND company_id = ? AND id != ?");
+            if (isset($data['phone_number']) && $data['phone_number'] !== $owner['phone']) {
+                $stmt = $conn->prepare("SELECT id FROM vehicle_owners WHERE phone = ? AND company_id = ? AND id != ?");
                 $stmt->execute([$data['phone_number'], $company_id, $data['id']]);
                 if ($stmt->fetch()) {
                     sendResponse(400, [
@@ -270,17 +266,15 @@ try {
                         // Create vehicle
                         $stmt = $conn->prepare("
                             INSERT INTO vehicles (
-                                plate_number, vehicle_type, seats, company_id, owner_id, created_by
-                            ) VALUES (?, ?, ?, ?, ?, ?)
+                                plate_number, vehicle_type, company_id, owner_id
+                            ) VALUES (?, ?, ?, ?)
                         ");
                         
                         $stmt->execute([
                             $vehicle['plate_number'],
                             $vehicle['vehicle_type'],
-                            $vehicle['seats'],
                             $company_id,
-                            $data['id'],
-                            $user_id
+                            $data['id']
                         ]);
                     }
                 }
@@ -294,7 +288,6 @@ try {
                                 'id', v.id,
                                 'plate_number', v.plate_number,
                                 'vehicle_type', v.vehicle_type,
-                                'seats', v.seats,
                                 'created_at', v.created_at
                             )
                         ) as vehicles

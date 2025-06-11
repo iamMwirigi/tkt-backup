@@ -78,15 +78,14 @@ try {
                 // Create vehicle
                 $stmt = $conn->prepare("
                     INSERT INTO vehicles (
-                        plate_number, vehicle_type, company_id, created_by
-                    ) VALUES (?, ?, ?, ?)
+                        plate_number, vehicle_type, company_id
+                    ) VALUES (?, ?, ?)
                 ");
                 
                 $stmt->execute([
                     $data['plate_number'],
                     $data['vehicle_type'],
-                    $company_id,
-                    $user_id
+                    $company_id
                 ]);
                 
                 $vehicle_id = $conn->lastInsertId();

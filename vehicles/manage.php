@@ -116,7 +116,7 @@ try {
                     SELECT 
                         v.*,
                         vo.name as owner_name,
-                        vo.phone_number as owner_phone
+                        vo.phone as owner_phone
                     FROM vehicles v
                     LEFT JOIN vehicle_owners vo ON v.owner_id = vo.id
                     WHERE v.id = ?
@@ -247,7 +247,7 @@ try {
                     SELECT 
                         v.*,
                         vo.name as owner_name,
-                        vo.phone_number as owner_phone
+                        vo.phone as owner_phone
                     FROM vehicles v
                     LEFT JOIN vehicle_owners vo ON v.owner_id = vo.id
                     WHERE v.id = ?

@@ -17,7 +17,7 @@ if (file_exists(__DIR__ . '/../vendor/autoload.php')) {
             $dotenv = Dotenv\Dotenv::createImmutable(__DIR__ . '/..');
             $dotenv->load();
         } catch (Exception $e) {
-            error_log("Dotenv Error in destinations/list.php: " . $e->getMessage());
+            error_log("Dotenv Error in fares/list.php: " . $e->getMessage());
         }
     }
 }
@@ -36,42 +36,28 @@ try {
     $db = new Database();
     $conn = $db->getConnection();
 
-    // Get all destinations for the company with their fares
+    // Get all fares for the company with their destination and route information
     $stmt = $conn->prepare("
-        SELECT d.*,
+        SELECT f.*,
+               d.name as destination_name,
+               d.stop_order,
+               r.id as route_id,
                r.name as route_name,
-               r.description as route_description,
-               JSON_ARRAYAGG(
-                   JSON_OBJECT(
-                       'id', f.id,
-                       'label', f.label,
-                       'amount', f.amount
-                   )
-               ) as fares
-        FROM destinations d
+               r.description as route_description
+        FROM fares f
+        JOIN destinations d ON f.destination_id = d.id
         JOIN routes r ON d.route_id = r.id
-        LEFT JOIN fares f ON d.id = f.destination_id
         WHERE r.company_id = ?
-        GROUP BY d.id
-        ORDER BY r.name ASC, d.stop_order ASC
+        ORDER BY r.name ASC, d.stop_order ASC, f.label ASC
     ");
     $stmt->execute([$company_id]);
-    $destinations = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-    // Parse fares JSON for each destination
-    foreach ($destinations as &$destination) {
-        $destination['fares'] = json_decode($destination['fares'], true);
-        // Remove null fares (if a destination has no fares)
-        if ($destination['fares'][0] === null) {
-            $destination['fares'] = [];
-        }
-    }
+    $fares = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
     sendResponse(200, [
         'success' => true,
-        'message' => 'Destinations retrieved successfully',
+        'message' => 'Fares retrieved successfully',
         'data' => [
-            'destinations' => $destinations
+            'fares' => $fares
         ]
     ]);
 
@@ -80,4 +66,5 @@ try {
         'error' => true,
         'message' => $e->getMessage()
     ]);
-} 
+}
+?> 

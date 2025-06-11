@@ -41,8 +41,16 @@ try {
     
     switch ($_SERVER['REQUEST_METHOD']) {
         case 'POST':
-            // Create new owner
-            validateRequiredFields(['name', 'phone_number'], $data);
+            // Create new owner with vehicles
+            validateRequiredFields(['name', 'phone_number', 'vehicles'], $data);
+            
+            // Validate vehicles array
+            if (!is_array($data['vehicles']) || empty($data['vehicles'])) {
+                sendResponse(400, [
+                    'error' => true,
+                    'message' => 'At least one vehicle is required'
+                ]);
+            }
             
             // Check if phone number already exists
             $stmt = $conn->prepare("SELECT id FROM vehicle_owners WHERE phone_number = ? AND company_id = ?");
@@ -54,31 +62,118 @@ try {
                 ]);
             }
             
-            // Create owner
-            $stmt = $conn->prepare("
-                INSERT INTO vehicle_owners (
-                    name, phone_number, company_id, created_by
-                ) VALUES (?, ?, ?, ?)
-            ");
+            // Start transaction
+            $conn->beginTransaction();
             
-            $stmt->execute([
-                $data['name'],
-                $data['phone_number'],
-                $company_id,
-                $user_id
-            ]);
-            
-            $owner_id = $conn->lastInsertId();
-            
-            sendResponse(201, [
-                'success' => true,
-                'message' => 'Owner created successfully',
-                'owner' => [
-                    'id' => $owner_id,
-                    'name' => $data['name'],
-                    'phone_number' => $data['phone_number']
-                ]
-            ]);
+            try {
+                // Create owner
+                $stmt = $conn->prepare("
+                    INSERT INTO vehicle_owners (
+                        name, phone_number, company_id, created_by
+                    ) VALUES (?, ?, ?, ?)
+                ");
+                
+                $stmt->execute([
+                    $data['name'],
+                    $data['phone_number'],
+                    $company_id,
+                    $user_id
+                ]);
+                
+                $owner_id = $conn->lastInsertId();
+                
+                // Process each vehicle
+                $vehicles = [];
+                foreach ($data['vehicles'] as $vehicle) {
+                    // Validate required vehicle fields
+                    if (empty($vehicle['plate_number']) || empty($vehicle['vehicle_type']) || empty($vehicle['seats'])) {
+                        throw new Exception("Each vehicle must have plate_number, vehicle_type, and seats");
+                    }
+                    
+                    // Validate plate number format (e.g., KBR 123A)
+                    if (!preg_match('/^[A-Z]{3}\s\d{3}[A-Z]$/', $vehicle['plate_number'])) {
+                        throw new Exception("Invalid plate number format for {$vehicle['plate_number']}. Use format: KBR 123A");
+                    }
+                    
+                    // Check if plate number already exists
+                    $stmt = $conn->prepare("SELECT id FROM vehicles WHERE plate_number = ?");
+                    $stmt->execute([$vehicle['plate_number']]);
+                    if ($stmt->fetch()) {
+                        throw new Exception("Plate number {$vehicle['plate_number']} already registered");
+                    }
+                    
+                    // Validate vehicle type
+                    $allowed_types = ['Bus', 'Van', 'Car', 'Truck'];
+                    if (!in_array($vehicle['vehicle_type'], $allowed_types)) {
+                        throw new Exception("Invalid vehicle type for {$vehicle['plate_number']}. Allowed types: " . implode(', ', $allowed_types));
+                    }
+                    
+                    // Validate seats
+                    if (!is_numeric($vehicle['seats']) || $vehicle['seats'] < 1) {
+                        throw new Exception("Invalid number of seats for {$vehicle['plate_number']}");
+                    }
+                    
+                    // Create vehicle
+                    $stmt = $conn->prepare("
+                        INSERT INTO vehicles (
+                            plate_number, vehicle_type, seats, company_id, owner_id, created_by
+                        ) VALUES (?, ?, ?, ?, ?, ?)
+                    ");
+                    
+                    $stmt->execute([
+                        $vehicle['plate_number'],
+                        $vehicle['vehicle_type'],
+                        $vehicle['seats'],
+                        $company_id,
+                        $owner_id,
+                        $user_id
+                    ]);
+                    
+                    $vehicle_id = $conn->lastInsertId();
+                    $vehicles[] = [
+                        'id' => $vehicle_id,
+                        'plate_number' => $vehicle['plate_number'],
+                        'vehicle_type' => $vehicle['vehicle_type'],
+                        'seats' => $vehicle['seats']
+                    ];
+                }
+                
+                // Get created owner with vehicles
+                $stmt = $conn->prepare("
+                    SELECT 
+                        vo.*,
+                        JSON_ARRAYAGG(
+                            JSON_OBJECT(
+                                'id', v.id,
+                                'plate_number', v.plate_number,
+                                'vehicle_type', v.vehicle_type,
+                                'seats', v.seats,
+                                'created_at', v.created_at
+                            )
+                        ) as vehicles
+                    FROM vehicle_owners vo
+                    LEFT JOIN vehicles v ON vo.id = v.owner_id
+                    WHERE vo.id = ?
+                    GROUP BY vo.id
+                ");
+                $stmt->execute([$owner_id]);
+                $owner = $stmt->fetch(PDO::FETCH_ASSOC);
+                
+                // Parse vehicles JSON
+                $owner['vehicles'] = json_decode($owner['vehicles'], true);
+                
+                $conn->commit();
+                
+                sendResponse(201, [
+                    'success' => true,
+                    'message' => 'Owner and vehicles created successfully',
+                    'owner' => $owner
+                ]);
+                
+            } catch (Exception $e) {
+                $conn->rollBack();
+                throw $e;
+            }
             break;
             
         case 'PUT':
@@ -109,43 +204,123 @@ try {
                 }
             }
             
-            // Build update query based on provided fields
-            $updates = [];
-            $params = [];
+            // Start transaction
+            $conn->beginTransaction();
             
-            $allowed_fields = [
-                'name',
-                'phone_number'
-            ];
-            
-            foreach ($allowed_fields as $field) {
-                if (isset($data[$field])) {
-                    $updates[] = "$field = ?";
-                    $params[] = $data[$field];
+            try {
+                // Build update query based on provided fields
+                $updates = [];
+                $params = [];
+                
+                $allowed_fields = [
+                    'name',
+                    'phone_number'
+                ];
+                
+                foreach ($allowed_fields as $field) {
+                    if (isset($data[$field])) {
+                        $updates[] = "$field = ?";
+                        $params[] = $data[$field];
+                    }
                 }
-            }
-            
-            if (empty($updates)) {
-                sendResponse(400, [
-                    'error' => true,
-                    'message' => 'No valid fields to update'
+                
+                if (!empty($updates)) {
+                    $params[] = $data['id'];
+                    $params[] = $company_id;
+                    
+                    $stmt = $conn->prepare("
+                        UPDATE vehicle_owners 
+                        SET " . implode(", ", $updates) . "
+                        WHERE id = ? AND company_id = ?
+                    ");
+                    $stmt->execute($params);
+                }
+                
+                // If new vehicles are provided, add them
+                if (isset($data['vehicles']) && is_array($data['vehicles'])) {
+                    foreach ($data['vehicles'] as $vehicle) {
+                        // Validate required vehicle fields
+                        if (empty($vehicle['plate_number']) || empty($vehicle['vehicle_type']) || empty($vehicle['seats'])) {
+                            throw new Exception("Each vehicle must have plate_number, vehicle_type, and seats");
+                        }
+                        
+                        // Validate plate number format
+                        if (!preg_match('/^[A-Z]{3}\s\d{3}[A-Z]$/', $vehicle['plate_number'])) {
+                            throw new Exception("Invalid plate number format for {$vehicle['plate_number']}. Use format: KBR 123A");
+                        }
+                        
+                        // Check if plate number already exists
+                        $stmt = $conn->prepare("SELECT id FROM vehicles WHERE plate_number = ?");
+                        $stmt->execute([$vehicle['plate_number']]);
+                        if ($stmt->fetch()) {
+                            throw new Exception("Plate number {$vehicle['plate_number']} already registered");
+                        }
+                        
+                        // Validate vehicle type
+                        $allowed_types = ['Bus', 'Van', 'Car', 'Truck'];
+                        if (!in_array($vehicle['vehicle_type'], $allowed_types)) {
+                            throw new Exception("Invalid vehicle type for {$vehicle['plate_number']}. Allowed types: " . implode(', ', $allowed_types));
+                        }
+                        
+                        // Validate seats
+                        if (!is_numeric($vehicle['seats']) || $vehicle['seats'] < 1) {
+                            throw new Exception("Invalid number of seats for {$vehicle['plate_number']}");
+                        }
+                        
+                        // Create vehicle
+                        $stmt = $conn->prepare("
+                            INSERT INTO vehicles (
+                                plate_number, vehicle_type, seats, company_id, owner_id, created_by
+                            ) VALUES (?, ?, ?, ?, ?, ?)
+                        ");
+                        
+                        $stmt->execute([
+                            $vehicle['plate_number'],
+                            $vehicle['vehicle_type'],
+                            $vehicle['seats'],
+                            $company_id,
+                            $data['id'],
+                            $user_id
+                        ]);
+                    }
+                }
+                
+                // Get updated owner with vehicles
+                $stmt = $conn->prepare("
+                    SELECT 
+                        vo.*,
+                        JSON_ARRAYAGG(
+                            JSON_OBJECT(
+                                'id', v.id,
+                                'plate_number', v.plate_number,
+                                'vehicle_type', v.vehicle_type,
+                                'seats', v.seats,
+                                'created_at', v.created_at
+                            )
+                        ) as vehicles
+                    FROM vehicle_owners vo
+                    LEFT JOIN vehicles v ON vo.id = v.owner_id
+                    WHERE vo.id = ?
+                    GROUP BY vo.id
+                ");
+                $stmt->execute([$data['id']]);
+                $updated_owner = $stmt->fetch(PDO::FETCH_ASSOC);
+                
+                // Parse vehicles JSON
+                $updated_owner['vehicles'] = json_decode($updated_owner['vehicles'], true);
+                
+                $conn->commit();
+                
+                sendResponse(200, [
+                    'success' => true,
+                    'message' => 'Owner updated successfully',
+                    'owner' => $updated_owner
                 ]);
+                
+            } catch (Exception $e) {
+                $conn->rollBack();
+                throw $e;
             }
-            
-            $params[] = $data['id'];
-            $params[] = $company_id;
-            
-            $stmt = $conn->prepare("
-                UPDATE vehicle_owners 
-                SET " . implode(", ", $updates) . "
-                WHERE id = ? AND company_id = ?
-            ");
-            $stmt->execute($params);
-            
-            sendResponse(200, [
-                'success' => true,
-                'message' => 'Owner updated successfully'
-            ]);
             break;
             
         case 'DELETE':
@@ -164,11 +339,12 @@ try {
                 ]);
             }
             
-            // Check if owner has any vehicles
+            // Check if owner has any vehicles with active trips
             $stmt = $conn->prepare("
                 SELECT COUNT(*) as count 
-                FROM vehicles 
-                WHERE owner_id = ?
+                FROM vehicles v
+                JOIN trips t ON v.id = t.vehicle_id
+                WHERE v.owner_id = ? AND t.status IN ('pending', 'in_progress')
             ");
             $stmt->execute([$data['id']]);
             $result = $stmt->fetch();
@@ -176,18 +352,33 @@ try {
             if ($result['count'] > 0) {
                 sendResponse(400, [
                     'error' => true,
-                    'message' => 'Cannot delete owner with registered vehicles. Please reassign or delete vehicles first.'
+                    'message' => 'Cannot delete owner with vehicles that have active trips'
                 ]);
             }
             
-            // Delete owner
-            $stmt = $conn->prepare("DELETE FROM vehicle_owners WHERE id = ? AND company_id = ?");
-            $stmt->execute([$data['id'], $company_id]);
+            // Start transaction
+            $conn->beginTransaction();
             
-            sendResponse(200, [
-                'success' => true,
-                'message' => 'Owner deleted successfully'
-            ]);
+            try {
+                // Delete owner's vehicles
+                $stmt = $conn->prepare("DELETE FROM vehicles WHERE owner_id = ? AND company_id = ?");
+                $stmt->execute([$data['id'], $company_id]);
+                
+                // Delete owner
+                $stmt = $conn->prepare("DELETE FROM vehicle_owners WHERE id = ? AND company_id = ?");
+                $stmt->execute([$data['id'], $company_id]);
+                
+                $conn->commit();
+                
+                sendResponse(200, [
+                    'success' => true,
+                    'message' => 'Owner and their vehicles deleted successfully'
+                ]);
+                
+            } catch (Exception $e) {
+                $conn->rollBack();
+                throw $e;
+            }
             break;
             
         default:

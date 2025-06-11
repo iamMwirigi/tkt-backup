@@ -35,37 +35,35 @@ $user_role = 'admin';
 try {
     $db = new Database();
     $conn = $db->getConnection();
-    
-    // Get all vehicles with their owners for the company
+
+    // Get all vehicles for the company with their owners
     $stmt = $conn->prepare("
         SELECT 
             v.*,
             vo.name as owner_name,
-            vo.phone as owner_phone,
-            vo.id_number as owner_id_number,
+            vo.phone_number as owner_phone,
             (
                 SELECT COUNT(*) 
                 FROM trips t 
                 WHERE t.vehicle_id = v.id 
-                AND t.status != 'completed'
-            ) as active_trips,
-            (
-                SELECT COUNT(*) 
-                FROM vehicle_seats vs 
-                WHERE vs.vehicle_id = v.id
-            ) as total_seats
+                AND t.status IN ('pending', 'in_progress')
+            ) as active_trips
         FROM vehicles v
         LEFT JOIN vehicle_owners vo ON v.owner_id = vo.id
         WHERE v.company_id = ?
-        ORDER BY v.created_at DESC
+        ORDER BY v.plate_number ASC
     ");
     $stmt->execute([$company_id]);
     $vehicles = $stmt->fetchAll(PDO::FETCH_ASSOC);
-    
+
     sendResponse(200, [
-        'vehicles' => $vehicles
+        'success' => true,
+        'message' => 'Vehicles retrieved successfully',
+        'data' => [
+            'vehicles' => $vehicles
+        ]
     ]);
-    
+
 } catch (Exception $e) {
     sendResponse(400, [
         'error' => true,

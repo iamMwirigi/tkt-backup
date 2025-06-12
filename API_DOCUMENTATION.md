@@ -1,8 +1,8 @@
 # TKT API Documentation
 
-## 1. Vehicle Management
+## 8. Vehicle Management
 
-### 1.1 List Vehicles
+### 8.1 List Vehicles
 ```http
 GET /vehicles/list.php
 ```
@@ -31,7 +31,7 @@ Response:
 }
 ```
 
-### 1.2 Create Vehicle
+### 8.2 Create Vehicle
 ```http
 POST /vehicles/manage.php
 Content-Type: application/json
@@ -49,17 +49,20 @@ Response (201 Created):
     "success": true,
     "message": "Vehicle created successfully",
     "vehicle": {
-        "id": 1,
+        "id": 9,
         "company_id": 1,
         "owner_id": 1,
         "plate_number": "KAA 123A",
         "vehicle_type": "Bus",
-        "created_at": "2025-04-14 10:09:04"
+        "created_at": "2025-06-11 11:14:30",
+        "vehicle_type_id": null,
+        "owner_name": "James Kariuki",
+        "owner_phone": "0722000001"
     }
 }
 ```
 
-### 1.3 Update Vehicle
+### 8.3 Update Vehicle
 ```http
 PUT /vehicles/manage.php
 Content-Type: application/json
@@ -87,7 +90,7 @@ Response (200 OK):
 }
 ```
 
-### 1.4 Delete Vehicle
+### 8.4 Delete Vehicle
 ```http
 DELETE /vehicles/manage.php
 Content-Type: application/json
@@ -105,9 +108,9 @@ Response (200 OK):
 }
 ```
 
-## 2. Vehicle Types Management
+## 9. Vehicle Types Management
 
-### 2.1 List Vehicle Types
+### 9.1 List Vehicle Types
 ```http
 GET /vehicle-types/list.php
 ```
@@ -136,7 +139,7 @@ Response:
 }
 ```
 
-### 2.2 Create Vehicle Type
+### 9.2 Create Vehicle Type
 ```http
 POST /vehicle-types/manage.php
 Content-Type: application/json
@@ -158,7 +161,7 @@ Response (201 Created):
 }
 ```
 
-### 2.3 Update Vehicle Type
+### 9.3 Update Vehicle Type
 ```http
 PUT /vehicle-types/manage.php
 Content-Type: application/json
@@ -181,7 +184,7 @@ Response (200 OK):
 }
 ```
 
-### 2.4 Delete Vehicle Type
+### 9.4 Delete Vehicle Type
 ```http
 DELETE /vehicle-types/manage.php
 Content-Type: application/json
@@ -199,9 +202,9 @@ Response (200 OK):
 }
 ```
 
-## 3. Owners Management
+## 10. Owners Management
 
-### 3.1 List Owners
+### 10.1 List Owners
 ```http
 GET /owners/list.php
 ```
@@ -225,7 +228,7 @@ Response:
 }
 ```
 
-### 3.2 Create Owner
+### 10.2 Create Owner
 ```http
 POST /owners/manage.php
 Content-Type: application/json
@@ -253,7 +256,7 @@ Response (201 Created):
 }
 ```
 
-### 3.3 Update Owner
+### 10.3 Update Owner
 ```http
 PUT /owners/manage.php
 Content-Type: application/json
@@ -280,7 +283,7 @@ Response (200 OK):
 }
 ```
 
-### 3.4 Delete Owner
+### 10.4 Delete Owner
 ```http
 DELETE /owners/manage.php
 Content-Type: application/json
@@ -298,9 +301,9 @@ Response (200 OK):
 }
 ```
 
-## 4. Trips Management
+## 11. Trips Management
 
-### 4.1 List Trips
+### 11.1 List Trips
 ```http
 GET /trips/list.php
 ```
@@ -336,7 +339,7 @@ Response:
 }
 ```
 
-### 4.2 Create Trip
+### 11.2 Create Trip
 ```http
 POST /trips/manage.php
 Content-Type: application/json
@@ -367,7 +370,7 @@ Response (201 Created):
 }
 ```
 
-### 4.3 Update Trip
+### 11.3 Update Trip
 ```http
 PUT /trips/manage.php
 Content-Type: application/json
@@ -396,7 +399,7 @@ Response (200 OK):
 }
 ```
 
-### 4.4 Delete Trip
+### 11.4 Delete Trip
 ```http
 DELETE /trips/manage.php
 Content-Type: application/json
@@ -414,9 +417,9 @@ Response (200 OK):
 }
 ```
 
-## 5. Tickets Management
+## 12. Tickets Management
 
-### 5.1 List Tickets
+### 12.1 List Tickets
 ```http
 GET /tickets/list.php
 ```
@@ -462,7 +465,7 @@ Response:
 }
 ```
 
-### 5.2 Create Ticket
+### 12.2 Create Ticket
 ```http
 POST /tickets/manage.php
 Content-Type: application/json
@@ -509,7 +512,7 @@ Response (201 Created):
 }
 ```
 
-### 5.3 Update Ticket
+### 12.3 Update Ticket
 ```http
 PUT /tickets/manage.php
 Content-Type: application/json
@@ -549,7 +552,7 @@ Response (200 OK):
 }
 ```
 
-### 5.4 Delete Ticket
+### 12.4 Delete Ticket
 ```http
 DELETE /tickets/manage.php
 Content-Type: application/json
@@ -565,76 +568,3 @@ Response (200 OK):
     "success": true,
     "message": "Ticket deleted successfully"
 }
-```
-
-## 6. Error Responses
-
-All endpoints may return the following error responses:
-
-### 6.1 400 Bad Request
-```json
-{
-    "error": true,
-    "message": "Error message here"
-}
-```
-
-### 6.2 404 Not Found
-```json
-{
-    "error": true,
-    "message": "Resource not found"
-}
-```
-
-### 6.3 405 Method Not Allowed
-```json
-{
-    "error": true,
-    "message": "Method not allowed"
-}
-```
-
-## 7. Important Notes
-
-1. **Company Context**:
-   - All operations are scoped to the company context
-   - Resources can only be accessed/modified within the company scope
-
-2. **Required Fields**:
-   - Vehicle Types: name
-   - Owners: name, phone, email, address
-   - Trips: vehicle_id, trip_code, departure_time, arrival_time, status
-   - Tickets: vehicle_id, trip_id, officer_id, destination_id, route, location
-
-3. **Status Values**:
-   - Trips: scheduled, in_progress, completed, cancelled
-   - Tickets: unpaid, paid
-
-4. **Relationships**:
-   - Tickets are linked to vehicles, trips, officers, and destinations
-   - Trips are linked to vehicles
-   - Vehicles are linked to vehicle types and owners
-
-## 8. Testing Tips
-
-1. **Vehicle Types**:
-   - Test name uniqueness
-   - Verify deletion with associated vehicles
-
-2. **Owners**:
-   - Test phone number format
-   - Verify email format
-   - Check deletion with associated vehicles
-
-3. **Trips**:
-   - Test trip code format
-   - Verify departure/arrival time logic
-   - Check status transitions
-   - Test with associated tickets
-
-4. **Tickets**:
-   - Test all filter combinations
-   - Verify status transitions
-   - Check delivery status updates
-   - Test with associated bookings and offenses 

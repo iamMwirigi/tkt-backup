@@ -1,22 +1,22 @@
 <?php
-// Set database credentials directly for this script
-$host = 'db.igurudb.com';
-$port = '3306';
-$dbname = 'tkt';
-$username = 'dev_ops1';
-$password = 'a26N8Iv22TC4kJdb'; // Replace with your actual password
+// Load environment variables
+if (file_exists(__DIR__ . '/vendor/autoload.php')) {
+    require_once __DIR__ . '/vendor/autoload.php';
+    if (class_exists('Dotenv\Dotenv')) {
+        try {
+            $dotenv = Dotenv\Dotenv::createImmutable(__DIR__);
+            $dotenv->load();
+        } catch (Exception $e) {
+            error_log("Dotenv Error in create_admin.php: " . $e->getMessage());
+        }
+    }
+}
+
+require_once __DIR__ . '/config/db.php';
 
 try {
-    $conn = new PDO(
-        "mysql:host=$host;port=$port;dbname=$dbname",
-        $username,
-        $password,
-        [
-            PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
-            PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-            PDO::MYSQL_ATTR_INIT_COMMAND => "SET NAMES utf8mb4"
-        ]
-    );
+    $db = new Database();
+    $conn = $db->getConnection();
 
     // First ensure company exists
     $stmt = $conn->prepare("
@@ -55,7 +55,6 @@ try {
         echo "You can now login with:\n";
         echo "Email: admin@zawadi.co.ke\n";
         echo "Password: admin123\n";
-        echo "Generated hash: " . $hashed_password . "\n";
         
         // Verify the user was created with admin role
         $stmt = $conn->prepare("SELECT * FROM users WHERE email = 'admin@zawadi.co.ke'");

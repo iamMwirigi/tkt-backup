@@ -28,7 +28,7 @@ require_once __DIR__ . '/../utils/functions.php';
 header('Content-Type: application/json');
 
 // Use dummy values for testing
-$user_id = 1;
+$user_id = 7;  // Admin user ID from create_admin.php
 $company_id = 1;
 $user_role = 'admin';
 

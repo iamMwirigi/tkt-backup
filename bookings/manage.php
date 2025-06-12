@@ -186,7 +186,7 @@ try {
                     seat_number, 
                     fare_amount,
                     status
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, 'pending')
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, 'booked')
             ");
             $stmt->execute([
                 $data['trip_id'],

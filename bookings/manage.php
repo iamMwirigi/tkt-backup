@@ -128,51 +128,44 @@ try {
             break;
             
         case 'POST':
-            // Create booking
-            validateRequiredFields([
-                'trip_id',
-                'customer_name',
-                'customer_phone',
-                'destination_id',
-                'seat_number',
-                'fare_amount'
-            ], $data);
+            // Create new booking
+            validateRequiredFields(['trip_id', 'customer_name', 'customer_phone', 'destination_id', 'seat_number', 'fare_amount'], $data);
             
             // Verify trip exists and belongs to company
             $stmt = $conn->prepare("
-                SELECT t.*, v.id as vehicle_id 
+                SELECT t.id 
                 FROM trips t
-                LEFT JOIN vehicles v ON t.vehicle_id = v.id
-                WHERE t.id = ? AND t.company_id = ?
+                JOIN routes r ON t.route_id = r.id
+                WHERE t.id = ? AND r.company_id = ?
             ");
             $stmt->execute([$data['trip_id'], $company_id]);
-            $trip = $stmt->fetch(PDO::FETCH_ASSOC);
-            
-            if (!$trip) {
+            if (!$stmt->fetch()) {
                 sendResponse(404, [
                     'error' => true,
                     'message' => 'Trip not found or does not belong to your company'
                 ]);
             }
             
-            // Verify destination exists and belongs to trip's route
+            // Verify destination exists and belongs to company
             $stmt = $conn->prepare("
-                SELECT d.* 
+                SELECT d.id 
                 FROM destinations d
-                WHERE d.id = ? AND d.route_id = ?
+                JOIN routes r ON d.route_id = r.id
+                WHERE d.id = ? AND r.company_id = ?
             ");
-            $stmt->execute([$data['destination_id'], $trip['route_id']]);
+            $stmt->execute([$data['destination_id'], $company_id]);
             if (!$stmt->fetch()) {
-                sendResponse(400, [
+                sendResponse(404, [
                     'error' => true,
-                    'message' => 'Invalid destination for this trip'
+                    'message' => 'Destination not found or does not belong to your company'
                 ]);
             }
             
-            // Verify seat is available
+            // Check if seat is already booked
             $stmt = $conn->prepare("
-                SELECT id FROM bookings 
-                WHERE trip_id = ? AND seat_number = ? AND status = 'booked'
+                SELECT id 
+                FROM bookings 
+                WHERE trip_id = ? AND seat_number = ? AND status != 'cancelled'
             ");
             $stmt->execute([$data['trip_id'], $data['seat_number']]);
             if ($stmt->fetch()) {
@@ -182,67 +175,52 @@ try {
                 ]);
             }
             
-            // Start transaction
-            $conn->beginTransaction();
+            // Create booking
+            $stmt = $conn->prepare("
+                INSERT INTO bookings (
+                    trip_id, 
+                    user_id,
+                    customer_name, 
+                    customer_phone, 
+                    destination_id, 
+                    seat_number, 
+                    fare_amount,
+                    status
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, 'pending')
+            ");
+            $stmt->execute([
+                $data['trip_id'],
+                $user_id,
+                $data['customer_name'],
+                $data['customer_phone'],
+                $data['destination_id'],
+                $data['seat_number'],
+                $data['fare_amount']
+            ]);
             
-            try {
-                // Create booking
-                $stmt = $conn->prepare("
-                    INSERT INTO bookings (
-                        company_id, trip_id, vehicle_id, user_id,
-                        customer_name, customer_phone, destination_id,
-                        seat_number, fare_amount, status
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'booked')
-                ");
-                
-                $stmt->execute([
-                    $company_id,
-                    $data['trip_id'],
-                    $trip['vehicle_id'],
-                    $user_id,
-                    $data['customer_name'],
-                    $data['customer_phone'],
-                    $data['destination_id'],
-                    $data['seat_number'],
-                    $data['fare_amount']
-                ]);
-                
-                $booking_id = $conn->lastInsertId();
-                
-                // Get created booking with details
-                $stmt = $conn->prepare("
-                    SELECT 
-                        b.*,
-                        t.trip_code,
-                        t.departure_time,
-                        v.plate_number,
-                        v.vehicle_type,
-                        d.name as destination_name,
-                        r.name as route_name,
-                        u.name as booked_by
-                    FROM bookings b
-                    LEFT JOIN trips t ON b.trip_id = t.id
-                    LEFT JOIN vehicles v ON b.vehicle_id = v.id
-                    LEFT JOIN destinations d ON b.destination_id = d.id
-                    LEFT JOIN routes r ON t.route_id = r.id
-                    LEFT JOIN users u ON b.user_id = u.id
-                    WHERE b.id = ?
-                ");
-                $stmt->execute([$booking_id]);
-                $booking = $stmt->fetch(PDO::FETCH_ASSOC);
-                
-                $conn->commit();
-                
-                sendResponse(201, [
-                    'success' => true,
-                    'message' => 'Booking created successfully',
-                    'booking' => $booking
-                ]);
-                
-            } catch (Exception $e) {
-                $conn->rollBack();
-                throw $e;
-            }
+            $booking_id = $conn->lastInsertId();
+            
+            // Get created booking
+            $stmt = $conn->prepare("
+                SELECT b.*, 
+                       t.departure_time,
+                       t.arrival_time,
+                       d.name as destination_name,
+                       r.name as route_name
+                FROM bookings b
+                JOIN trips t ON b.trip_id = t.id
+                JOIN destinations d ON b.destination_id = d.id
+                JOIN routes r ON t.route_id = r.id
+                WHERE b.id = ?
+            ");
+            $stmt->execute([$booking_id]);
+            $booking = $stmt->fetch(PDO::FETCH_ASSOC);
+            
+            sendResponse(201, [
+                'success' => true,
+                'message' => 'Booking created successfully',
+                'booking' => $booking
+            ]);
             break;
             
         case 'PUT':

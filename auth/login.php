@@ -66,9 +66,17 @@ $conn = $db->getConnection();
 try {
     // Get user
     $stmt = $conn->prepare("
-        SELECT u.*, c.name as company_name 
+        SELECT 
+            u.*,
+            c.id as company_id,
+            c.name as company_name,
+            c.email as company_email,
+            o.id as office_id,
+            o.name as office_name,
+            o.location as office_location
         FROM users u 
-        JOIN companies c ON u.company_id = c.id 
+        LEFT JOIN companies c ON u.company_id = c.id 
+        LEFT JOIN offices o ON u.office_id = o.id
         WHERE u.email = ?
     ");
     $stmt->execute([$data['email']]);
@@ -145,7 +153,16 @@ try {
             'name' => $user['name'],
             'email' => $user['email'],
             'role' => $user['role'],
-            'company' => $user['company_name']
+            'company' => [
+                'id' => $user['company_id'],
+                'name' => $user['company_name'],
+                'email' => $user['company_email']
+            ],
+            'office' => $user['office_id'] ? [
+                'id' => $user['office_id'],
+                'name' => $user['office_name'],
+                'location' => $user['office_location']
+            ] : null
         ]
     ]);
 
@@ -153,6 +170,6 @@ try {
     sendResponse(500, [
         'error' => true,
         'message' => 'Login failed due to a database issue.',
-        'details' => $e->getMessage() // This will include the specific SQL error
+        'details' => $e->getMessage()
     ]);
 }

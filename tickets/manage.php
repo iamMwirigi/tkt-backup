@@ -111,26 +111,24 @@ try {
                 $stmt = $conn->prepare("
                     SELECT 
                         t.*,
-                        b.reference_number as booking_reference,
+                        b.id as booking_id,
+                        b.customer_name,
+                        b.customer_phone,
+                        b.seat_number,
+                        b.fare_amount,
                         b.status as booking_status,
-                        b.payment_status as booking_payment_status,
-                        b.payment_method as booking_payment_method,
-                        b.amount as booking_amount,
-                        b.created_at as booking_created_at,
-                        b.updated_at as booking_updated_at,
+                        b.booked_at,
                         u.name as user_name,
                         u.email as user_email,
                         u.phone as user_phone,
-                        tr.reference_number as trip_reference,
+                        tr.trip_code,
                         tr.status as trip_status,
                         tr.departure_time,
                         tr.arrival_time,
                         v.plate_number as vehicle_plate,
                         v.vehicle_type,
                         d.name as destination_name,
-                        d.code as destination_code,
                         r.name as route_name,
-                        r.code as route_code,
                         c.name as company_name
                     FROM tickets t
                     LEFT JOIN bookings b ON t.booking_id = b.id

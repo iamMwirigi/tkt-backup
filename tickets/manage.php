@@ -109,20 +109,39 @@ try {
                 $where_clause = implode(' AND ', $where);
                 
                 $stmt = $conn->prepare("
-                    SELECT t.*, 
-                        v.plate_number,
-                        tr.trip_code,
-                        u.name as officer_name,
-                        o.title as offense_title,
-                        d.name as destination_name
+                    SELECT 
+                        t.*,
+                        b.reference_number as booking_reference,
+                        b.status as booking_status,
+                        b.payment_status as booking_payment_status,
+                        b.payment_method as booking_payment_method,
+                        b.amount as booking_amount,
+                        b.created_at as booking_created_at,
+                        b.updated_at as booking_updated_at,
+                        u.name as user_name,
+                        u.email as user_email,
+                        u.phone as user_phone,
+                        tr.reference_number as trip_reference,
+                        tr.status as trip_status,
+                        tr.departure_time,
+                        tr.arrival_time,
+                        v.plate_number as vehicle_plate,
+                        v.vehicle_type,
+                        d.name as destination_name,
+                        d.code as destination_code,
+                        r.name as route_name,
+                        r.code as route_code,
+                        c.name as company_name
                     FROM tickets t
-                    LEFT JOIN vehicles v ON t.vehicle_id = v.id
-                    LEFT JOIN trips tr ON t.trip_id = tr.id
-                    LEFT JOIN users u ON t.officer_id = u.id
-                    LEFT JOIN offenses o ON t.offense_id = o.id
-                    LEFT JOIN destinations d ON t.destination_id = d.id
+                    LEFT JOIN bookings b ON t.booking_id = b.id
+                    LEFT JOIN users u ON b.user_id = u.id
+                    LEFT JOIN trips tr ON b.trip_id = tr.id
+                    LEFT JOIN vehicles v ON tr.vehicle_id = v.id
+                    LEFT JOIN destinations d ON tr.destination_id = d.id
+                    LEFT JOIN routes r ON tr.route_id = r.id
+                    LEFT JOIN companies c ON t.company_id = c.id
                     WHERE $where_clause
-                    ORDER BY t.created_at DESC
+                    ORDER BY t.id DESC
                 ");
                 $stmt->execute($params);
                 $tickets = $stmt->fetchAll(PDO::FETCH_ASSOC);

@@ -134,8 +134,8 @@ try {
                     LEFT JOIN users u ON b.user_id = u.id
                     LEFT JOIN trips tr ON b.trip_id = tr.id
                     LEFT JOIN vehicles v ON tr.vehicle_id = v.id
-                    LEFT JOIN destinations d ON tr.destination_id = d.id
                     LEFT JOIN routes r ON tr.route_id = r.id
+                    LEFT JOIN destinations d ON b.destination_id = d.id
                     LEFT JOIN companies c ON t.company_id = c.id
                     WHERE $where_clause
                     ORDER BY t.id DESC

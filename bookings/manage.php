@@ -39,6 +39,14 @@ try {
     // Get request body
     $data = json_decode(file_get_contents('php://input'), true);
     
+    // Validate company_id
+    if (!isset($data['company_id'])) {
+        sendResponse(400, [
+            'error' => true,
+            'message' => 'company_id is required'
+        ]);
+    }
+    
     switch ($_SERVER['REQUEST_METHOD']) {
         case 'GET':
             // Get bookings
@@ -62,7 +70,7 @@ try {
                     LEFT JOIN users u ON b.user_id = u.id
                     WHERE b.id = ? AND b.company_id = ?
                 ");
-                $stmt->execute([$_GET['id'], $company_id]);
+                $stmt->execute([$_GET['id'], $data['company_id']]);
                 $booking = $stmt->fetch(PDO::FETCH_ASSOC);
                 
                 if (!$booking) {
@@ -79,7 +87,7 @@ try {
             } else {
                 // Get all bookings with filters
                 $where = ['b.company_id = ?'];
-                $params = [$company_id];
+                $params = [$data['company_id']];
                 
                 if (isset($_GET['trip_id'])) {
                     $where[] = 'b.trip_id = ?';
@@ -138,7 +146,7 @@ try {
                 JOIN routes r ON t.route_id = r.id
                 WHERE t.id = ? AND r.company_id = ?
             ");
-            $stmt->execute([$data['trip_id'], $company_id]);
+            $stmt->execute([$data['trip_id'], $data['company_id']]);
             if (!$stmt->fetch()) {
                 sendResponse(404, [
                     'error' => true,
@@ -153,7 +161,7 @@ try {
                 JOIN routes r ON d.route_id = r.id
                 WHERE d.id = ? AND r.company_id = ?
             ");
-            $stmt->execute([$data['destination_id'], $company_id]);
+            $stmt->execute([$data['destination_id'], $data['company_id']]);
             if (!$stmt->fetch()) {
                 sendResponse(404, [
                     'error' => true,
@@ -185,17 +193,19 @@ try {
                     destination_id, 
                     seat_number, 
                     fare_amount,
-                    status
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, 'booked')
+                    status,
+                    company_id
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, 'booked', ?)
             ");
             $stmt->execute([
                 $data['trip_id'],
-                $user_id,
+                $data['user_id'] ?? null,
                 $data['customer_name'],
                 $data['customer_phone'],
                 $data['destination_id'],
                 $data['seat_number'],
-                $data['fare_amount']
+                $data['fare_amount'],
+                $data['company_id']
             ]);
             
             $booking_id = $conn->lastInsertId();
@@ -229,7 +239,7 @@ try {
             
             // Verify booking exists and belongs to company
             $stmt = $conn->prepare("SELECT * FROM bookings WHERE id = ? AND company_id = ?");
-            $stmt->execute([$data['id'], $company_id]);
+            $stmt->execute([$data['id'], $data['company_id']]);
             $booking = $stmt->fetch(PDO::FETCH_ASSOC);
             
             if (!$booking) {
@@ -250,6 +260,7 @@ try {
                 $allowed_fields = [
                     'customer_name',
                     'customer_phone',
+                    'destination_id',
                     'seat_number',
                     'fare_amount',
                     'status'
@@ -257,71 +268,50 @@ try {
                 
                 foreach ($allowed_fields as $field) {
                     if (isset($data[$field])) {
-                        // Validate status if being updated
-                        if ($field === 'status') {
-                            $allowed_statuses = ['booked', 'cancelled', 'converted'];
-                            if (!in_array($data['status'], $allowed_statuses)) {
-                                throw new Exception('Invalid status. Allowed values: ' . implode(', ', $allowed_statuses));
-                            }
-                        }
-                        
-                        // Verify seat is available if being changed
-                        if ($field === 'seat_number' && $data['seat_number'] !== $booking['seat_number']) {
-                            $stmt = $conn->prepare("
-                                SELECT id FROM bookings 
-                                WHERE trip_id = ? AND seat_number = ? AND id != ? AND status = 'booked'
-                            ");
-                            $stmt->execute([$booking['trip_id'], $data['seat_number'], $data['id']]);
-                            if ($stmt->fetch()) {
-                                throw new Exception('Seat is already booked');
-                            }
-                        }
-                        
                         $updates[] = "$field = ?";
                         $params[] = $data[$field];
                     }
                 }
                 
-                if (!empty($updates)) {
-                    $params[] = $data['id'];
-                    $params[] = $company_id;
-                    
-                    $stmt = $conn->prepare("
-                        UPDATE bookings 
-                        SET " . implode(", ", $updates) . "
-                        WHERE id = ? AND company_id = ?
-                    ");
-                    $stmt->execute($params);
+                if (empty($updates)) {
+                    sendResponse(400, [
+                        'error' => true,
+                        'message' => 'No valid fields to update'
+                    ]);
                 }
                 
-                // Get updated booking with details
+                $params[] = $data['id'];
+                $params[] = $data['company_id'];
+                
                 $stmt = $conn->prepare("
-                    SELECT 
-                        b.*,
-                        t.trip_code,
-                        t.departure_time,
-                        v.plate_number,
-                        v.vehicle_type,
-                        d.name as destination_name,
-                        r.name as route_name,
-                        u.name as booked_by
+                    UPDATE bookings 
+                    SET " . implode(', ', $updates) . "
+                    WHERE id = ? AND company_id = ?
+                ");
+                $stmt->execute($params);
+                
+                $conn->commit();
+                
+                // Get updated booking
+                $stmt = $conn->prepare("
+                    SELECT b.*, 
+                           t.departure_time,
+                           t.arrival_time,
+                           d.name as destination_name,
+                           r.name as route_name
                     FROM bookings b
-                    LEFT JOIN trips t ON b.trip_id = t.id
-                    LEFT JOIN vehicles v ON b.vehicle_id = v.id
-                    LEFT JOIN destinations d ON b.destination_id = d.id
-                    LEFT JOIN routes r ON t.route_id = r.id
-                    LEFT JOIN users u ON b.user_id = u.id
+                    JOIN trips t ON b.trip_id = t.id
+                    JOIN destinations d ON b.destination_id = d.id
+                    JOIN routes r ON t.route_id = r.id
                     WHERE b.id = ?
                 ");
                 $stmt->execute([$data['id']]);
-                $updated_booking = $stmt->fetch(PDO::FETCH_ASSOC);
-                
-                $conn->commit();
+                $booking = $stmt->fetch(PDO::FETCH_ASSOC);
                 
                 sendResponse(200, [
                     'success' => true,
                     'message' => 'Booking updated successfully',
-                    'booking' => $updated_booking
+                    'booking' => $booking
                 ]);
                 
             } catch (Exception $e) {
@@ -336,33 +326,24 @@ try {
             
             // Verify booking exists and belongs to company
             $stmt = $conn->prepare("SELECT * FROM bookings WHERE id = ? AND company_id = ?");
-            $stmt->execute([$data['id'], $company_id]);
-            if (!$stmt->fetch()) {
+            $stmt->execute([$data['id'], $data['company_id']]);
+            $booking = $stmt->fetch(PDO::FETCH_ASSOC);
+            
+            if (!$booking) {
                 sendResponse(404, [
                     'error' => true,
                     'message' => 'Booking not found or does not belong to your company'
                 ]);
             }
             
-            // Start transaction
-            $conn->beginTransaction();
+            // Delete booking
+            $stmt = $conn->prepare("DELETE FROM bookings WHERE id = ? AND company_id = ?");
+            $stmt->execute([$data['id'], $data['company_id']]);
             
-            try {
-                // Delete booking
-                $stmt = $conn->prepare("DELETE FROM bookings WHERE id = ? AND company_id = ?");
-                $stmt->execute([$data['id'], $company_id]);
-                
-                $conn->commit();
-                
-                sendResponse(200, [
-                    'success' => true,
-                    'message' => 'Booking deleted successfully'
-                ]);
-                
-            } catch (Exception $e) {
-                $conn->rollBack();
-                throw $e;
-            }
+            sendResponse(200, [
+                'success' => true,
+                'message' => 'Booking deleted successfully'
+            ]);
             break;
             
         default:

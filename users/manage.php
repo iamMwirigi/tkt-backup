@@ -34,6 +34,14 @@ try {
     // Get request body
     $data = json_decode(file_get_contents('php://input'), true);
     
+    // Validate company_id
+    if (!isset($data['company_id'])) {
+        sendResponse(400, [
+            'error' => true,
+            'message' => 'company_id is required'
+        ]);
+    }
+    
     switch ($_SERVER['REQUEST_METHOD']) {
         case 'GET':
             // Get users
@@ -44,9 +52,9 @@ try {
                     FROM users u
                     LEFT JOIN companies c ON u.company_id = c.id
                     LEFT JOIN offices o ON u.office_id = o.id
-                    WHERE u.id = ?
+                    WHERE u.id = ? AND u.company_id = ?
                 ");
-                $stmt->execute([$_GET['id']]);
+                $stmt->execute([$_GET['id'], $data['company_id']]);
                 $user = $stmt->fetch(PDO::FETCH_ASSOC);
                 
                 if (!$user) {
@@ -62,13 +70,8 @@ try {
                 ]);
             } else {
                 // Get all users with filters
-                $where = ['1=1'];
-                $params = [];
-                
-                if (isset($_GET['company_id'])) {
-                    $where[] = 'u.company_id = ?';
-                    $params[] = $_GET['company_id'];
-                }
+                $where = ['u.company_id = ?'];
+                $params = [$data['company_id']];
                 
                 if (isset($_GET['office_id'])) {
                     $where[] = 'u.office_id = ?';
@@ -114,26 +117,8 @@ try {
             // Create new user
             validateRequiredFields(['name', 'email', 'password', 'role'], $data);
             
-            // Validate company exists if provided
-            if (isset($data['company_id'])) {
-                $stmt = $conn->prepare("SELECT id FROM companies WHERE id = ?");
-                $stmt->execute([$data['company_id']]);
-                if (!$stmt->fetch()) {
-                    sendResponse(400, [
-                        'error' => true,
-                        'message' => 'Invalid company ID'
-                    ]);
-                }
-            }
-            
             // Validate office exists if provided
             if (isset($data['office_id'])) {
-                if (!isset($data['company_id'])) {
-                    sendResponse(400, [
-                        'error' => true,
-                        'message' => 'Company ID is required when specifying an office'
-                    ]);
-                }
                 $stmt = $conn->prepare("SELECT id FROM offices WHERE id = ? AND company_id = ?");
                 $stmt->execute([$data['office_id'], $data['company_id']]);
                 if (!$stmt->fetch()) {
@@ -163,7 +148,7 @@ try {
                 $data['email'],
                 password_hash($data['password'], PASSWORD_DEFAULT),
                 $data['role'],
-                $data['company_id'] ?? null,
+                $data['company_id'],
                 $data['office_id'] ?? null
             ]);
             
@@ -178,15 +163,15 @@ try {
             // Update existing user
             validateRequiredFields(['id'], $data);
             
-            // Verify user exists
-            $stmt = $conn->prepare("SELECT id, company_id FROM users WHERE id = ?");
-            $stmt->execute([$data['id']]);
+            // Verify user exists and belongs to company
+            $stmt = $conn->prepare("SELECT id FROM users WHERE id = ? AND company_id = ?");
+            $stmt->execute([$data['id'], $data['company_id']]);
             $existingUser = $stmt->fetch();
             
             if (!$existingUser) {
                 sendResponse(404, [
                     'error' => true,
-                    'message' => 'User not found'
+                    'message' => 'User not found or does not belong to your company'
                 ]);
             }
             
@@ -219,13 +204,13 @@ try {
                 $params[] = $data['role'];
             }
             if (isset($data['office_id'])) {
-                // Validate office belongs to user's company
+                // Validate office belongs to company
                 $stmt = $conn->prepare("SELECT id FROM offices WHERE id = ? AND company_id = ?");
-                $stmt->execute([$data['office_id'], $existingUser['company_id']]);
+                $stmt->execute([$data['office_id'], $data['company_id']]);
                 if (!$stmt->fetch()) {
                     sendResponse(400, [
                         'error' => true,
-                        'message' => 'Invalid office ID or office does not belong to the user\'s company'
+                        'message' => 'Invalid office ID or office does not belong to your company'
                     ]);
                 }
                 $updates[] = "office_id = ?";
@@ -240,11 +225,12 @@ try {
             }
             
             $params[] = $data['id'];
+            $params[] = $data['company_id'];
             
             $stmt = $conn->prepare("
                 UPDATE users 
                 SET " . implode(", ", $updates) . "
-                WHERE id = ?
+                WHERE id = ? AND company_id = ?
             ");
             $stmt->execute($params);
             
@@ -258,34 +244,21 @@ try {
             // Delete user
             validateRequiredFields(['id'], $data);
             
-            // Verify user exists
-            $stmt = $conn->prepare("SELECT id FROM users WHERE id = ?");
-            $stmt->execute([$data['id']]);
-            if (!$stmt->fetch()) {
+            // Verify user exists and belongs to company
+            $stmt = $conn->prepare("SELECT id FROM users WHERE id = ? AND company_id = ?");
+            $stmt->execute([$data['id'], $data['company_id']]);
+            $user = $stmt->fetch();
+            
+            if (!$user) {
                 sendResponse(404, [
                     'error' => true,
-                    'message' => 'User not found'
+                    'message' => 'User not found or does not belong to your company'
                 ]);
             }
             
-            // Check if user has any active bookings
-            $stmt = $conn->prepare("
-                SELECT COUNT(*) as count 
-                FROM bookings 
-                WHERE user_id = ? AND status != 'completed'
-            ");
-            $stmt->execute([$data['id']]);
-            $result = $stmt->fetch();
-            
-            if ($result['count'] > 0) {
-                sendResponse(400, [
-                    'error' => true,
-                    'message' => 'Cannot delete user with active bookings'
-                ]);
-            }
-            
-            $stmt = $conn->prepare("DELETE FROM users WHERE id = ?");
-            $stmt->execute([$data['id']]);
+            // Delete user
+            $stmt = $conn->prepare("DELETE FROM users WHERE id = ? AND company_id = ?");
+            $stmt->execute([$data['id'], $data['company_id']]);
             
             sendResponse(200, [
                 'success' => true,
@@ -298,12 +271,11 @@ try {
                 'error' => true,
                 'message' => 'Method not allowed'
             ]);
-            break;
     }
+    
 } catch (Exception $e) {
-    error_log("Error in users/manage.php: " . $e->getMessage());
-    sendResponse(500, [
+    sendResponse(400, [
         'error' => true,
-        'message' => 'Internal server error'
+        'message' => $e->getMessage()
     ]);
 } 

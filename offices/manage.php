@@ -27,11 +27,6 @@ require_once __DIR__ . '/../utils/functions.php';
 
 header('Content-Type: application/json');
 
-// Use dummy values for testing
-$user_id = 1;
-$company_id = 1;
-$user_role = 'admin';
-
 try {
     $db = new Database();
     $conn = $db->getConnection();
@@ -39,7 +34,58 @@ try {
     // Get request body
     $data = json_decode(file_get_contents('php://input'), true);
     
+    // Validate company_id
+    if (!isset($data['company_id'])) {
+        sendResponse(400, [
+            'error' => true,
+            'message' => 'company_id is required'
+        ]);
+    }
+    
     switch ($_SERVER['REQUEST_METHOD']) {
+        case 'GET':
+            // Get offices
+            if (isset($_GET['id'])) {
+                // Get single office
+                $stmt = $conn->prepare("
+                    SELECT o.*, c.name as company_name
+                    FROM offices o
+                    LEFT JOIN companies c ON o.company_id = c.id
+                    WHERE o.id = ? AND o.company_id = ?
+                ");
+                $stmt->execute([$_GET['id'], $data['company_id']]);
+                $office = $stmt->fetch(PDO::FETCH_ASSOC);
+                
+                if (!$office) {
+                    sendResponse(404, [
+                        'error' => true,
+                        'message' => 'Office not found'
+                    ]);
+                }
+                
+                sendResponse(200, [
+                    'success' => true,
+                    'office' => $office
+                ]);
+            } else {
+                // Get all offices
+                $stmt = $conn->prepare("
+                    SELECT o.*, c.name as company_name
+                    FROM offices o
+                    LEFT JOIN companies c ON o.company_id = c.id
+                    WHERE o.company_id = ?
+                    ORDER BY o.name ASC
+                ");
+                $stmt->execute([$data['company_id']]);
+                $offices = $stmt->fetchAll(PDO::FETCH_ASSOC);
+                
+                sendResponse(200, [
+                    'success' => true,
+                    'offices' => $offices
+                ]);
+            }
+            break;
+            
         case 'POST':
             // Create new office
             validateRequiredFields(['name', 'location'], $data);
@@ -49,7 +95,7 @@ try {
                 VALUES (?, ?, ?)
             ");
             $stmt->execute([
-                $company_id,
+                $data['company_id'],
                 $data['name'],
                 $data['location']
             ]);
@@ -67,7 +113,7 @@ try {
             
             // Verify office belongs to company
             $stmt = $conn->prepare("SELECT id FROM offices WHERE id = ? AND company_id = ?");
-            $stmt->execute([$data['id'], $company_id]);
+            $stmt->execute([$data['id'], $data['company_id']]);
             if (!$stmt->fetch()) {
                 sendResponse(404, [
                     'error' => true,
@@ -95,7 +141,7 @@ try {
             }
             
             $params[] = $data['id'];
-            $params[] = $company_id;
+            $params[] = $data['company_id'];
             
             $stmt = $conn->prepare("
                 UPDATE offices 
@@ -116,7 +162,7 @@ try {
             
             // Verify office belongs to company
             $stmt = $conn->prepare("SELECT id FROM offices WHERE id = ? AND company_id = ?");
-            $stmt->execute([$data['id'], $company_id]);
+            $stmt->execute([$data['id'], $data['company_id']]);
             if (!$stmt->fetch()) {
                 sendResponse(404, [
                     'error' => true,
@@ -138,7 +184,7 @@ try {
             
             // Delete office
             $stmt = $conn->prepare("DELETE FROM offices WHERE id = ? AND company_id = ?");
-            $stmt->execute([$data['id'], $company_id]);
+            $stmt->execute([$data['id'], $data['company_id']]);
             
             sendResponse(200, [
                 'success' => true,

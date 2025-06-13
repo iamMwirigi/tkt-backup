@@ -27,11 +27,6 @@ require_once __DIR__ . '/../utils/functions.php';
 
 header('Content-Type: application/json');
 
-// Use dummy values for testing
-$user_id = 1;
-$company_id = 1;
-$user_role = 'admin';
-
 try {
     $db = new Database();
     $conn = $db->getConnection();
@@ -39,14 +34,61 @@ try {
     // Get request body
     $data = json_decode(file_get_contents('php://input'), true);
     
+    // Validate company_id
+    if (!isset($data['company_id'])) {
+        sendResponse(400, [
+            'error' => true,
+            'message' => 'company_id is required'
+        ]);
+    }
+    
     switch ($_SERVER['REQUEST_METHOD']) {
+        case 'GET':
+            // Get vehicle types
+            if (isset($_GET['id'])) {
+                // Get single vehicle type
+                $stmt = $conn->prepare("
+                    SELECT * FROM vehicle_types 
+                    WHERE id = ? AND company_id = ?
+                ");
+                $stmt->execute([$_GET['id'], $data['company_id']]);
+                $vehicle_type = $stmt->fetch(PDO::FETCH_ASSOC);
+                
+                if (!$vehicle_type) {
+                    sendResponse(404, [
+                        'error' => true,
+                        'message' => 'Vehicle type not found'
+                    ]);
+                }
+                
+                sendResponse(200, [
+                    'success' => true,
+                    'vehicle_type' => $vehicle_type
+                ]);
+            } else {
+                // Get all vehicle types
+                $stmt = $conn->prepare("
+                    SELECT * FROM vehicle_types 
+                    WHERE company_id = ?
+                    ORDER BY name ASC
+                ");
+                $stmt->execute([$data['company_id']]);
+                $vehicle_types = $stmt->fetchAll(PDO::FETCH_ASSOC);
+                
+                sendResponse(200, [
+                    'success' => true,
+                    'vehicle_types' => $vehicle_types
+                ]);
+            }
+            break;
+            
         case 'POST':
             // Create new vehicle type
             validateRequiredFields(['name'], $data);
             
             // Check if vehicle type already exists for company
             $stmt = $conn->prepare("SELECT id FROM vehicle_types WHERE name = ? AND company_id = ?");
-            $stmt->execute([$data['name'], $company_id]);
+            $stmt->execute([$data['name'], $data['company_id']]);
             if ($stmt->fetch()) {
                 sendResponse(400, [
                     'error' => true,
@@ -63,7 +105,7 @@ try {
             
             $stmt->execute([
                 $data['name'],
-                $company_id
+                $data['company_id']
             ]);
             
             $type_id = $conn->lastInsertId();
@@ -88,7 +130,7 @@ try {
             
             // Verify vehicle type exists and belongs to company
             $stmt = $conn->prepare("SELECT * FROM vehicle_types WHERE id = ? AND company_id = ?");
-            $stmt->execute([$data['id'], $company_id]);
+            $stmt->execute([$data['id'], $data['company_id']]);
             $vehicle_type = $stmt->fetch(PDO::FETCH_ASSOC);
             
             if (!$vehicle_type) {
@@ -100,7 +142,7 @@ try {
             
             // Check if new name already exists
             $stmt = $conn->prepare("SELECT id FROM vehicle_types WHERE name = ? AND company_id = ? AND id != ?");
-            $stmt->execute([$data['name'], $company_id, $data['id']]);
+            $stmt->execute([$data['name'], $data['company_id'], $data['id']]);
             if ($stmt->fetch()) {
                 sendResponse(400, [
                     'error' => true,
@@ -118,7 +160,7 @@ try {
             $stmt->execute([
                 $data['name'],
                 $data['id'],
-                $company_id
+                $data['company_id']
             ]);
             
             // Get updated vehicle type
@@ -141,7 +183,7 @@ try {
             
             // Verify vehicle type exists and belongs to company
             $stmt = $conn->prepare("SELECT * FROM vehicle_types WHERE id = ? AND company_id = ?");
-            $stmt->execute([$data['id'], $company_id]);
+            $stmt->execute([$data['id'], $data['company_id']]);
             $vehicle_type = $stmt->fetch(PDO::FETCH_ASSOC);
             
             if (!$vehicle_type) {
@@ -169,7 +211,7 @@ try {
             
             // Delete vehicle type
             $stmt = $conn->prepare("DELETE FROM vehicle_types WHERE id = ? AND company_id = ?");
-            $stmt->execute([$data['id'], $company_id]);
+            $stmt->execute([$data['id'], $data['company_id']]);
             
             sendResponse(200, [
                 'success' => true,

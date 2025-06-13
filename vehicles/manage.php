@@ -27,11 +27,6 @@ require_once __DIR__ . '/../utils/functions.php';
 
 header('Content-Type: application/json');
 
-// Use dummy values for testing
-$user_id = 1;
-$company_id = 1;
-$user_role = 'admin';
-
 try {
     $db = new Database();
     $conn = $db->getConnection();
@@ -39,7 +34,88 @@ try {
     // Get request body
     $data = json_decode(file_get_contents('php://input'), true);
     
+    // Validate company_id
+    if (!isset($data['company_id'])) {
+        sendResponse(400, [
+            'error' => true,
+            'message' => 'company_id is required'
+        ]);
+    }
+    
     switch ($_SERVER['REQUEST_METHOD']) {
+        case 'GET':
+            // Get vehicles
+            if (isset($_GET['id'])) {
+                // Get single vehicle
+                $stmt = $conn->prepare("
+                    SELECT 
+                        v.*,
+                        vo.name as owner_name,
+                        vo.phone as owner_phone,
+                        c.name as company_name
+                    FROM vehicles v
+                    LEFT JOIN vehicle_owners vo ON v.owner_id = vo.id
+                    LEFT JOIN companies c ON v.company_id = c.id
+                    WHERE v.id = ? AND v.company_id = ?
+                ");
+                $stmt->execute([$_GET['id'], $data['company_id']]);
+                $vehicle = $stmt->fetch(PDO::FETCH_ASSOC);
+                
+                if (!$vehicle) {
+                    sendResponse(404, [
+                        'error' => true,
+                        'message' => 'Vehicle not found'
+                    ]);
+                }
+                
+                sendResponse(200, [
+                    'success' => true,
+                    'vehicle' => $vehicle
+                ]);
+            } else {
+                // Get all vehicles with filters
+                $where = ['v.company_id = ?'];
+                $params = [$data['company_id']];
+                
+                if (isset($_GET['plate_number'])) {
+                    $where[] = 'v.plate_number LIKE ?';
+                    $params[] = '%' . $_GET['plate_number'] . '%';
+                }
+                
+                if (isset($_GET['vehicle_type'])) {
+                    $where[] = 'v.vehicle_type = ?';
+                    $params[] = $_GET['vehicle_type'];
+                }
+                
+                if (isset($_GET['owner_id'])) {
+                    $where[] = 'v.owner_id = ?';
+                    $params[] = $_GET['owner_id'];
+                }
+                
+                $where_clause = implode(' AND ', $where);
+                
+                $stmt = $conn->prepare("
+                    SELECT 
+                        v.*,
+                        vo.name as owner_name,
+                        vo.phone as owner_phone,
+                        c.name as company_name
+                    FROM vehicles v
+                    LEFT JOIN vehicle_owners vo ON v.owner_id = vo.id
+                    LEFT JOIN companies c ON v.company_id = c.id
+                    WHERE $where_clause
+                    ORDER BY v.plate_number ASC
+                ");
+                $stmt->execute($params);
+                $vehicles = $stmt->fetchAll(PDO::FETCH_ASSOC);
+                
+                sendResponse(200, [
+                    'success' => true,
+                    'vehicles' => $vehicles
+                ]);
+            }
+            break;
+            
         case 'POST':
             // Create new vehicle
             validateRequiredFields(['plate_number', 'vehicle_type'], $data);
@@ -85,7 +161,7 @@ try {
                 $stmt->execute([
                     $data['plate_number'],
                     $data['vehicle_type'],
-                    $company_id
+                    $data['company_id']
                 ]);
                 
                 $vehicle_id = $conn->lastInsertId();
@@ -97,7 +173,7 @@ try {
                         SELECT id FROM vehicle_owners 
                         WHERE id = ? AND company_id = ?
                     ");
-                    $stmt->execute([$data['owner_id'], $company_id]);
+                    $stmt->execute([$data['owner_id'], $data['company_id']]);
                     if (!$stmt->fetch()) {
                         throw new Exception("Owner not found or does not belong to your company");
                     }
@@ -144,7 +220,7 @@ try {
             
             // Verify vehicle exists and belongs to company
             $stmt = $conn->prepare("SELECT * FROM vehicles WHERE id = ? AND company_id = ?");
-            $stmt->execute([$data['id'], $company_id]);
+            $stmt->execute([$data['id'], $data['company_id']]);
             $vehicle = $stmt->fetch(PDO::FETCH_ASSOC);
             
             if (!$vehicle) {
@@ -201,7 +277,7 @@ try {
                 
                 if (!empty($updates)) {
                     $params[] = $data['id'];
-                    $params[] = $company_id;
+                    $params[] = $data['company_id'];
                     
                     $stmt = $conn->prepare("
                         UPDATE vehicles 
@@ -227,7 +303,7 @@ try {
                             SELECT id FROM vehicle_owners 
                             WHERE id = ? AND company_id = ?
                         ");
-                        $stmt->execute([$data['owner_id'], $company_id]);
+                        $stmt->execute([$data['owner_id'], $data['company_id']]);
                         if (!$stmt->fetch()) {
                             throw new Exception("Owner not found or does not belong to your company");
                         }
@@ -274,22 +350,20 @@ try {
             validateRequiredFields(['id'], $data);
             
             // Verify vehicle exists and belongs to company
-            $stmt = $conn->prepare("SELECT * FROM vehicles WHERE id = ? AND company_id = ?");
-            $stmt->execute([$data['id'], $company_id]);
-            $vehicle = $stmt->fetch(PDO::FETCH_ASSOC);
-            
-            if (!$vehicle) {
+            $stmt = $conn->prepare("SELECT id FROM vehicles WHERE id = ? AND company_id = ?");
+            $stmt->execute([$data['id'], $data['company_id']]);
+            if (!$stmt->fetch()) {
                 sendResponse(404, [
                     'error' => true,
                     'message' => 'Vehicle not found or does not belong to your company'
                 ]);
             }
             
-            // Check if vehicle has any active trips
+            // Check if vehicle has any active bookings
             $stmt = $conn->prepare("
                 SELECT COUNT(*) as count 
-                FROM trips 
-                WHERE vehicle_id = ? AND status IN ('pending', 'in_progress')
+                FROM bookings 
+                WHERE vehicle_id = ? AND status != 'completed'
             ");
             $stmt->execute([$data['id']]);
             $result = $stmt->fetch();
@@ -297,13 +371,13 @@ try {
             if ($result['count'] > 0) {
                 sendResponse(400, [
                     'error' => true,
-                    'message' => 'Cannot delete vehicle with active trips'
+                    'message' => 'Cannot delete vehicle with active bookings'
                 ]);
             }
             
             // Delete vehicle
             $stmt = $conn->prepare("DELETE FROM vehicles WHERE id = ? AND company_id = ?");
-            $stmt->execute([$data['id'], $company_id]);
+            $stmt->execute([$data['id'], $data['company_id']]);
             
             sendResponse(200, [
                 'success' => true,

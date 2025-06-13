@@ -27,11 +27,6 @@ require_once __DIR__ . '/../utils/functions.php';
 
 header('Content-Type: application/json');
 
-// Use dummy values for testing
-$user_id = 1;
-$company_id = 1;
-$user_role = 'admin';
-
 try {
     $db = new Database();
     $conn = $db->getConnection();
@@ -39,14 +34,113 @@ try {
     // Get request body
     $data = json_decode(file_get_contents('php://input'), true);
     
+    // Validate company_id
+    if (!isset($data['company_id'])) {
+        sendResponse(400, [
+            'error' => true,
+            'message' => 'company_id is required'
+        ]);
+    }
+    
     switch ($_SERVER['REQUEST_METHOD']) {
+        case 'GET':
+            // Get tickets
+            if (isset($_GET['id'])) {
+                // Get single ticket
+                $stmt = $conn->prepare("
+                    SELECT t.*, 
+                        v.plate_number,
+                        tr.trip_code,
+                        u.name as officer_name,
+                        o.title as offense_title,
+                        d.name as destination_name
+                    FROM tickets t
+                    LEFT JOIN vehicles v ON t.vehicle_id = v.id
+                    LEFT JOIN trips tr ON t.trip_id = tr.id
+                    LEFT JOIN users u ON t.officer_id = u.id
+                    LEFT JOIN offenses o ON t.offense_id = o.id
+                    LEFT JOIN destinations d ON t.destination_id = d.id
+                    WHERE t.id = ? AND t.company_id = ?
+                ");
+                $stmt->execute([$_GET['id'], $data['company_id']]);
+                $ticket = $stmt->fetch(PDO::FETCH_ASSOC);
+                
+                if (!$ticket) {
+                    sendResponse(404, [
+                        'error' => true,
+                        'message' => 'Ticket not found'
+                    ]);
+                }
+                
+                sendResponse(200, [
+                    'success' => true,
+                    'ticket' => $ticket
+                ]);
+            } else {
+                // Get all tickets with filters
+                $where = ['t.company_id = ?'];
+                $params = [$data['company_id']];
+                
+                if (isset($_GET['vehicle_id'])) {
+                    $where[] = 't.vehicle_id = ?';
+                    $params[] = $_GET['vehicle_id'];
+                }
+                
+                if (isset($_GET['trip_id'])) {
+                    $where[] = 't.trip_id = ?';
+                    $params[] = $_GET['trip_id'];
+                }
+                
+                if (isset($_GET['officer_id'])) {
+                    $where[] = 't.officer_id = ?';
+                    $params[] = $_GET['officer_id'];
+                }
+                
+                if (isset($_GET['status'])) {
+                    $where[] = 't.status = ?';
+                    $params[] = $_GET['status'];
+                }
+                
+                if (isset($_GET['date'])) {
+                    $where[] = 'DATE(t.created_at) = ?';
+                    $params[] = $_GET['date'];
+                }
+                
+                $where_clause = implode(' AND ', $where);
+                
+                $stmt = $conn->prepare("
+                    SELECT t.*, 
+                        v.plate_number,
+                        tr.trip_code,
+                        u.name as officer_name,
+                        o.title as offense_title,
+                        d.name as destination_name
+                    FROM tickets t
+                    LEFT JOIN vehicles v ON t.vehicle_id = v.id
+                    LEFT JOIN trips tr ON t.trip_id = tr.id
+                    LEFT JOIN users u ON t.officer_id = u.id
+                    LEFT JOIN offenses o ON t.offense_id = o.id
+                    LEFT JOIN destinations d ON t.destination_id = d.id
+                    WHERE $where_clause
+                    ORDER BY t.created_at DESC
+                ");
+                $stmt->execute($params);
+                $tickets = $stmt->fetchAll(PDO::FETCH_ASSOC);
+                
+                sendResponse(200, [
+                    'success' => true,
+                    'tickets' => $tickets
+                ]);
+            }
+            break;
+            
         case 'POST':
             // Create new ticket
             validateRequiredFields(['vehicle_id', 'trip_id', 'officer_id', 'destination_id', 'route', 'location'], $data);
             
             // Verify vehicle exists and belongs to company
             $stmt = $conn->prepare("SELECT id FROM vehicles WHERE id = ? AND company_id = ?");
-            $stmt->execute([$data['vehicle_id'], $company_id]);
+            $stmt->execute([$data['vehicle_id'], $data['company_id']]);
             if (!$stmt->fetch()) {
                 sendResponse(404, [
                     'error' => true,
@@ -56,7 +150,7 @@ try {
             
             // Verify trip exists and belongs to company
             $stmt = $conn->prepare("SELECT id FROM trips WHERE id = ? AND company_id = ?");
-            $stmt->execute([$data['trip_id'], $company_id]);
+            $stmt->execute([$data['trip_id'], $data['company_id']]);
             if (!$stmt->fetch()) {
                 sendResponse(404, [
                     'error' => true,
@@ -66,7 +160,7 @@ try {
             
             // Verify officer exists and belongs to company
             $stmt = $conn->prepare("SELECT id FROM users WHERE id = ? AND company_id = ?");
-            $stmt->execute([$data['officer_id'], $company_id]);
+            $stmt->execute([$data['officer_id'], $data['company_id']]);
             if (!$stmt->fetch()) {
                 sendResponse(404, [
                     'error' => true,
@@ -87,7 +181,7 @@ try {
             // Verify offense exists if provided
             if (!empty($data['offense_id'])) {
                 $stmt = $conn->prepare("SELECT id FROM offenses WHERE id = ? AND company_id = ?");
-                $stmt->execute([$data['offense_id'], $company_id]);
+                $stmt->execute([$data['offense_id'], $data['company_id']]);
                 if (!$stmt->fetch()) {
                     sendResponse(404, [
                         'error' => true,
@@ -106,7 +200,7 @@ try {
             ");
             
             $stmt->execute([
-                $company_id,
+                $data['company_id'],
                 $data['vehicle_id'],
                 $data['trip_id'],
                 $data['officer_id'],
@@ -153,7 +247,7 @@ try {
             
             // Verify ticket exists and belongs to company
             $stmt = $conn->prepare("SELECT * FROM tickets WHERE id = ? AND company_id = ?");
-            $stmt->execute([$data['id'], $company_id]);
+            $stmt->execute([$data['id'], $data['company_id']]);
             $ticket = $stmt->fetch(PDO::FETCH_ASSOC);
             
             if (!$ticket) {
@@ -179,7 +273,7 @@ try {
                     if (in_array($field, ['vehicle_id', 'trip_id', 'officer_id', 'destination_id'])) {
                         $table = $field === 'officer_id' ? 'users' : ($field === 'destination_id' ? 'destinations' : $field . 's');
                         $stmt = $conn->prepare("SELECT id FROM $table WHERE id = ?" . ($field !== 'destination_id' ? " AND company_id = ?" : ""));
-                        $stmt->execute($field === 'destination_id' ? [$data[$field]] : [$data[$field], $company_id]);
+                        $stmt->execute($field === 'destination_id' ? [$data[$field]] : [$data[$field], $data['company_id']]);
                         if (!$stmt->fetch()) {
                             sendResponse(404, [
                                 'error' => true,
@@ -201,7 +295,7 @@ try {
             }
             
             $params[] = $data['id'];
-            $params[] = $company_id;
+            $params[] = $data['company_id'];
             
             $stmt = $conn->prepare("
                 UPDATE tickets 
@@ -243,7 +337,7 @@ try {
             
             // Verify ticket exists and belongs to company
             $stmt = $conn->prepare("SELECT * FROM tickets WHERE id = ? AND company_id = ?");
-            $stmt->execute([$data['id'], $company_id]);
+            $stmt->execute([$data['id'], $data['company_id']]);
             $ticket = $stmt->fetch(PDO::FETCH_ASSOC);
             
             if (!$ticket) {
@@ -255,7 +349,7 @@ try {
             
             // Delete ticket
             $stmt = $conn->prepare("DELETE FROM tickets WHERE id = ? AND company_id = ?");
-            $stmt->execute([$data['id'], $company_id]);
+            $stmt->execute([$data['id'], $data['company_id']]);
             
             sendResponse(200, [
                 'success' => true,

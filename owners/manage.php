@@ -27,11 +27,6 @@ require_once __DIR__ . '/../utils/functions.php';
 
 header('Content-Type: application/json');
 
-// Use dummy values for testing
-$user_id = 1;
-$company_id = 1;
-$user_role = 'admin';
-
 try {
     $db = new Database();
     $conn = $db->getConnection();
@@ -39,7 +34,101 @@ try {
     // Get request body
     $data = json_decode(file_get_contents('php://input'), true);
     
+    // Validate company_id
+    if (!isset($data['company_id'])) {
+        sendResponse(400, [
+            'error' => true,
+            'message' => 'company_id is required'
+        ]);
+    }
+    
     switch ($_SERVER['REQUEST_METHOD']) {
+        case 'GET':
+            // Get owners
+            if (isset($_GET['id'])) {
+                // Get single owner
+                $stmt = $conn->prepare("
+                    SELECT 
+                        vo.*,
+                        JSON_ARRAYAGG(
+                            JSON_OBJECT(
+                                'id', v.id,
+                                'plate_number', v.plate_number,
+                                'vehicle_type', v.vehicle_type,
+                                'created_at', v.created_at
+                            )
+                        ) as vehicles
+                    FROM vehicle_owners vo
+                    LEFT JOIN vehicles v ON vo.id = v.owner_id
+                    WHERE vo.id = ? AND vo.company_id = ?
+                    GROUP BY vo.id
+                ");
+                $stmt->execute([$_GET['id'], $data['company_id']]);
+                $owner = $stmt->fetch(PDO::FETCH_ASSOC);
+                
+                if (!$owner) {
+                    sendResponse(404, [
+                        'error' => true,
+                        'message' => 'Owner not found'
+                    ]);
+                }
+                
+                // Parse vehicles JSON
+                $owner['vehicles'] = json_decode($owner['vehicles'], true);
+                
+                sendResponse(200, [
+                    'success' => true,
+                    'owner' => $owner
+                ]);
+            } else {
+                // Get all owners with filters
+                $where = ['vo.company_id = ?'];
+                $params = [$data['company_id']];
+                
+                if (isset($_GET['name'])) {
+                    $where[] = 'vo.name LIKE ?';
+                    $params[] = '%' . $_GET['name'] . '%';
+                }
+                
+                if (isset($_GET['phone'])) {
+                    $where[] = 'vo.phone = ?';
+                    $params[] = $_GET['phone'];
+                }
+                
+                $where_clause = implode(' AND ', $where);
+                
+                $stmt = $conn->prepare("
+                    SELECT 
+                        vo.*,
+                        JSON_ARRAYAGG(
+                            JSON_OBJECT(
+                                'id', v.id,
+                                'plate_number', v.plate_number,
+                                'vehicle_type', v.vehicle_type,
+                                'created_at', v.created_at
+                            )
+                        ) as vehicles
+                    FROM vehicle_owners vo
+                    LEFT JOIN vehicles v ON vo.id = v.owner_id
+                    WHERE $where_clause
+                    GROUP BY vo.id
+                    ORDER BY vo.name ASC
+                ");
+                $stmt->execute($params);
+                $owners = $stmt->fetchAll(PDO::FETCH_ASSOC);
+                
+                // Parse vehicles JSON for each owner
+                foreach ($owners as &$owner) {
+                    $owner['vehicles'] = json_decode($owner['vehicles'], true);
+                }
+                
+                sendResponse(200, [
+                    'success' => true,
+                    'owners' => $owners
+                ]);
+            }
+            break;
+            
         case 'POST':
             // Create new owner with vehicles
             validateRequiredFields(['name', 'phone_number', 'vehicles'], $data);
@@ -54,7 +143,7 @@ try {
             
             // Check if phone number already exists
             $stmt = $conn->prepare("SELECT id FROM vehicle_owners WHERE phone = ? AND company_id = ?");
-            $stmt->execute([$data['phone_number'], $company_id]);
+            $stmt->execute([$data['phone_number'], $data['company_id']]);
             if ($stmt->fetch()) {
                 sendResponse(400, [
                     'error' => true,
@@ -76,7 +165,7 @@ try {
                 $stmt->execute([
                     $data['name'],
                     $data['phone_number'],
-                    $company_id
+                    $data['company_id']
                 ]);
                 
                 $owner_id = $conn->lastInsertId();
@@ -122,7 +211,7 @@ try {
                     $stmt->execute([
                         $vehicle['plate_number'],
                         $vehicle['vehicle_type'],
-                        $company_id,
+                        $data['company_id'],
                         $owner_id
                     ]);
                     
@@ -178,7 +267,7 @@ try {
             
             // Verify owner exists and belongs to company
             $stmt = $conn->prepare("SELECT * FROM vehicle_owners WHERE id = ? AND company_id = ?");
-            $stmt->execute([$data['id'], $company_id]);
+            $stmt->execute([$data['id'], $data['company_id']]);
             $owner = $stmt->fetch(PDO::FETCH_ASSOC);
             
             if (!$owner) {
@@ -191,7 +280,7 @@ try {
             // Check if new phone number already exists
             if (isset($data['phone_number']) && $data['phone_number'] !== $owner['phone']) {
                 $stmt = $conn->prepare("SELECT id FROM vehicle_owners WHERE phone = ? AND company_id = ? AND id != ?");
-                $stmt->execute([$data['phone_number'], $company_id, $data['id']]);
+                $stmt->execute([$data['phone_number'], $data['company_id'], $data['id']]);
                 if ($stmt->fetch()) {
                     sendResponse(400, [
                         'error' => true,
@@ -222,7 +311,7 @@ try {
                 
                 if (!empty($updates)) {
                     $params[] = $data['id'];
-                    $params[] = $company_id;
+                    $params[] = $data['company_id'];
                     
                     $stmt = $conn->prepare("
                         UPDATE vehicle_owners 
@@ -273,7 +362,7 @@ try {
                         $stmt->execute([
                             $vehicle['plate_number'],
                             $vehicle['vehicle_type'],
-                            $company_id,
+                            $data['company_id'],
                             $data['id']
                         ]);
                     }
@@ -297,17 +386,17 @@ try {
                     GROUP BY vo.id
                 ");
                 $stmt->execute([$data['id']]);
-                $updated_owner = $stmt->fetch(PDO::FETCH_ASSOC);
+                $owner = $stmt->fetch(PDO::FETCH_ASSOC);
                 
                 // Parse vehicles JSON
-                $updated_owner['vehicles'] = json_decode($updated_owner['vehicles'], true);
+                $owner['vehicles'] = json_decode($owner['vehicles'], true);
                 
                 $conn->commit();
                 
                 sendResponse(200, [
                     'success' => true,
                     'message' => 'Owner updated successfully',
-                    'owner' => $updated_owner
+                    'owner' => $owner
                 ]);
                 
             } catch (Exception $e) {
@@ -322,7 +411,7 @@ try {
             
             // Verify owner exists and belongs to company
             $stmt = $conn->prepare("SELECT * FROM vehicle_owners WHERE id = ? AND company_id = ?");
-            $stmt->execute([$data['id'], $company_id]);
+            $stmt->execute([$data['id'], $data['company_id']]);
             $owner = $stmt->fetch(PDO::FETCH_ASSOC);
             
             if (!$owner) {
@@ -355,11 +444,11 @@ try {
             try {
                 // Delete owner's vehicles
                 $stmt = $conn->prepare("DELETE FROM vehicles WHERE owner_id = ? AND company_id = ?");
-                $stmt->execute([$data['id'], $company_id]);
+                $stmt->execute([$data['id'], $data['company_id']]);
                 
                 // Delete owner
                 $stmt = $conn->prepare("DELETE FROM vehicle_owners WHERE id = ? AND company_id = ?");
-                $stmt->execute([$data['id'], $company_id]);
+                $stmt->execute([$data['id'], $data['company_id']]);
                 
                 $conn->commit();
                 

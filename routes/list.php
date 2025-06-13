@@ -54,12 +54,23 @@ try {
     $db = new Database();
     $conn = $db->getConnection();
 
+    // Get request body
+    $data = json_decode(file_get_contents('php://input'), true);
+    
+    // Validate company_id
+    if (!isset($data['company_id'])) {
+        sendResponse(400, [
+            'error' => true,
+            'message' => 'company_id is required'
+        ]);
+    }
+
     // Verify device for non-admin users
     if ($user_role !== 'admin' && !verifyDevice($conn, $user_id, $device_id)) {
         sendResponse(400, ['error' => true, 'message' => 'Invalid device']);
     }
 
-    // Get all routes for the company
+    // Get all routes for the specified company
     $stmt = $conn->prepare("
         SELECT r.*, 
                COUNT(DISTINCT d.id) as destination_count
@@ -69,7 +80,7 @@ try {
         GROUP BY r.id
         ORDER BY r.name ASC
     ");
-    $stmt->execute([$company_id]);
+    $stmt->execute([$data['company_id']]);
     $routes = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
     sendResponse(200, [

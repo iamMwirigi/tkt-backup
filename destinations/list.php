@@ -27,16 +27,22 @@ require_once __DIR__ . '/../utils/functions.php';
 
 header('Content-Type: application/json');
 
-// Use dummy values for testing
-$user_id = 1;
-$company_id = 1;
-$user_role = 'admin';
-
 try {
     $db = new Database();
     $conn = $db->getConnection();
 
-    // Get all destinations for the company with their fares
+    // Get request body
+    $data = json_decode(file_get_contents('php://input'), true);
+    
+    // Validate company_id
+    if (!isset($data['company_id'])) {
+        sendResponse(400, [
+            'error' => true,
+            'message' => 'company_id is required'
+        ]);
+    }
+
+    // Get all destinations for the specified company with their fares
     $stmt = $conn->prepare("
         SELECT d.*,
                r.name as route_name,
@@ -55,7 +61,7 @@ try {
         GROUP BY d.id
         ORDER BY r.name ASC, d.stop_order ASC
     ");
-    $stmt->execute([$company_id]);
+    $stmt->execute([$data['company_id']]);
     $destinations = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
     // Parse fares JSON for each destination

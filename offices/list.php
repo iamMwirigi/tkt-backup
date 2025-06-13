@@ -27,16 +27,22 @@ require_once __DIR__ . '/../utils/functions.php';
 
 header('Content-Type: application/json');
 
-// Use dummy values for testing
-$user_id = 1;
-$company_id = 1;
-$user_role = 'admin';
-
 try {
     $db = new Database();
     $conn = $db->getConnection();
     
-    // Get all offices for the company
+    // Get request body
+    $data = json_decode(file_get_contents('php://input'), true);
+    
+    // Validate company_id
+    if (!isset($data['company_id'])) {
+        sendResponse(400, [
+            'error' => true,
+            'message' => 'company_id is required'
+        ]);
+    }
+    
+    // Get all offices for the specified company
     $stmt = $conn->prepare("
         SELECT o.*, 
                COUNT(u.id) as user_count
@@ -46,12 +52,15 @@ try {
         GROUP BY o.id
         ORDER BY o.name ASC
     ");
-    $stmt->execute([$company_id]);
+    $stmt->execute([$data['company_id']]);
     $offices = $stmt->fetchAll(PDO::FETCH_ASSOC);
     
     sendResponse(200, [
         'success' => true,
-        'offices' => $offices
+        'message' => 'Offices retrieved successfully',
+        'data' => [
+            'offices' => $offices
+        ]
     ]);
     
 } catch (Exception $e) {

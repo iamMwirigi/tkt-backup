@@ -27,16 +27,22 @@ require_once __DIR__ . '/../utils/functions.php';
 
 header('Content-Type: application/json');
 
-// Use dummy values for testing
-$user_id = 1;
-$company_id = 1;
-$user_role = 'admin';
-
 try {
     $db = new Database();
     $conn = $db->getConnection();
 
-    // Get all vehicles for the company with their owners
+    // Get request body
+    $data = json_decode(file_get_contents('php://input'), true);
+    
+    // Validate company_id
+    if (!isset($data['company_id'])) {
+        sendResponse(400, [
+            'error' => true,
+            'message' => 'company_id is required'
+        ]);
+    }
+
+    // Get all vehicles for the specified company with their owners
     $stmt = $conn->prepare("
         SELECT 
             v.*,
@@ -53,7 +59,7 @@ try {
         WHERE v.company_id = ?
         ORDER BY v.plate_number ASC
     ");
-    $stmt->execute([$company_id]);
+    $stmt->execute([$data['company_id']]);
     $vehicles = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
     sendResponse(200, [

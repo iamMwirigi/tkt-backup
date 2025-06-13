@@ -17,7 +17,7 @@ if (file_exists(__DIR__ . '/../vendor/autoload.php')) {
             $dotenv = Dotenv\Dotenv::createImmutable(__DIR__ . '/..');
             $dotenv->load();
         } catch (Exception $e) {
-            error_log("Dotenv Error in users/manage.php: " . $e->getMessage());
+            error_log("Dotenv Error in companies/manage.php: " . $e->getMessage());
         }
     }
 }
@@ -36,116 +36,83 @@ try {
     
     switch ($_SERVER['REQUEST_METHOD']) {
         case 'GET':
-            // Get users
+            // Get companies
             if (isset($_GET['id'])) {
-                // Get single user
+                // Get single company
                 $stmt = $conn->prepare("
-                    SELECT u.*, c.name as company_name, o.name as office_name
-                    FROM users u
-                    LEFT JOIN companies c ON u.company_id = c.id
-                    LEFT JOIN offices o ON u.office_id = o.id
-                    WHERE u.id = ?
+                    SELECT 
+                        c.*,
+                        COUNT(DISTINCT u.id) as total_users,
+                        COUNT(DISTINCT v.id) as total_vehicles,
+                        COUNT(DISTINCT t.id) as total_trips
+                    FROM companies c
+                    LEFT JOIN users u ON c.id = u.company_id
+                    LEFT JOIN vehicles v ON c.id = v.company_id
+                    LEFT JOIN trips t ON c.id = t.company_id
+                    WHERE c.id = ?
+                    GROUP BY c.id
                 ");
                 $stmt->execute([$_GET['id']]);
-                $user = $stmt->fetch(PDO::FETCH_ASSOC);
+                $company = $stmt->fetch(PDO::FETCH_ASSOC);
                 
-                if (!$user) {
+                if (!$company) {
                     sendResponse(404, [
                         'error' => true,
-                        'message' => 'User not found'
+                        'message' => 'Company not found'
                     ]);
                 }
                 
                 sendResponse(200, [
                     'success' => true,
-                    'user' => $user
+                    'company' => $company
                 ]);
             } else {
-                // Get all users with filters
+                // Get all companies with filters
                 $where = ['1=1'];
                 $params = [];
                 
-                if (isset($_GET['company_id'])) {
-                    $where[] = 'u.company_id = ?';
-                    $params[] = $_GET['company_id'];
-                }
-                
-                if (isset($_GET['office_id'])) {
-                    $where[] = 'u.office_id = ?';
-                    $params[] = $_GET['office_id'];
-                }
-                
-                if (isset($_GET['role'])) {
-                    $where[] = 'u.role = ?';
-                    $params[] = $_GET['role'];
-                }
-                
                 if (isset($_GET['name'])) {
-                    $where[] = 'u.name LIKE ?';
+                    $where[] = 'c.name LIKE ?';
                     $params[] = '%' . $_GET['name'] . '%';
                 }
                 
                 if (isset($_GET['email'])) {
-                    $where[] = 'u.email LIKE ?';
+                    $where[] = 'c.email LIKE ?';
                     $params[] = '%' . $_GET['email'] . '%';
                 }
                 
                 $where_clause = implode(' AND ', $where);
                 
                 $stmt = $conn->prepare("
-                    SELECT u.*, c.name as company_name, o.name as office_name
-                    FROM users u
-                    LEFT JOIN companies c ON u.company_id = c.id
-                    LEFT JOIN offices o ON u.office_id = o.id
+                    SELECT 
+                        c.*,
+                        COUNT(DISTINCT u.id) as total_users,
+                        COUNT(DISTINCT v.id) as total_vehicles,
+                        COUNT(DISTINCT t.id) as total_trips
+                    FROM companies c
+                    LEFT JOIN users u ON c.id = u.company_id
+                    LEFT JOIN vehicles v ON c.id = v.company_id
+                    LEFT JOIN trips t ON c.id = t.company_id
                     WHERE $where_clause
-                    ORDER BY u.created_at DESC
+                    GROUP BY c.id
+                    ORDER BY c.created_at DESC
                 ");
                 $stmt->execute($params);
-                $users = $stmt->fetchAll(PDO::FETCH_ASSOC);
+                $companies = $stmt->fetchAll(PDO::FETCH_ASSOC);
                 
                 sendResponse(200, [
                     'success' => true,
-                    'users' => $users
+                    'companies' => $companies
                 ]);
             }
             break;
             
         case 'POST':
-            // Create new user
-            validateRequiredFields(['name', 'email', 'password', 'role'], $data);
-            
-            // Validate company exists if provided
-            if (isset($data['company_id'])) {
-                $stmt = $conn->prepare("SELECT id FROM companies WHERE id = ?");
-                $stmt->execute([$data['company_id']]);
-                if (!$stmt->fetch()) {
-                    sendResponse(400, [
-                        'error' => true,
-                        'message' => 'Invalid company ID'
-                    ]);
-                }
-            }
-            
-            // Validate office exists if provided
-            if (isset($data['office_id'])) {
-                if (!isset($data['company_id'])) {
-                    sendResponse(400, [
-                        'error' => true,
-                        'message' => 'Company ID is required when specifying an office'
-                    ]);
-                }
-                $stmt = $conn->prepare("SELECT id FROM offices WHERE id = ? AND company_id = ?");
-                $stmt->execute([$data['office_id'], $data['company_id']]);
-                if (!$stmt->fetch()) {
-                    sendResponse(400, [
-                        'error' => true,
-                        'message' => 'Invalid office ID or office does not belong to the specified company'
-                    ]);
-                }
-            }
+            // Create new company
+            validateRequiredFields(['name', 'email', 'password'], $data);
             
             // Check if email already exists
-            $stmt = $conn->prepare("SELECT id FROM users WHERE email = ?");
+            $stmt = $conn->prepare("SELECT id FROM companies WHERE email = ?");
             $stmt->execute([$data['email']]);
             if ($stmt->fetch()) {
                 sendResponse(400, [
@@ -155,38 +122,33 @@ try {
             }
             
             $stmt = $conn->prepare("
-                INSERT INTO users (name, email, password, role, company_id, office_id) 
-                VALUES (?, ?, ?, ?, ?, ?)
+                INSERT INTO companies (name, email, password) 
+                VALUES (?, ?, ?)
             ");
             $stmt->execute([
                 $data['name'],
                 $data['email'],
-                password_hash($data['password'], PASSWORD_DEFAULT),
-                $data['role'],
-                $data['company_id'] ?? null,
-                $data['office_id'] ?? null
+                password_hash($data['password'], PASSWORD_DEFAULT)
             ]);
             
             sendResponse(201, [
                 'success' => true,
-                'message' => 'User created successfully',
-                'user_id' => $conn->lastInsertId()
+                'message' => 'Company created successfully',
+                'company_id' => $conn->lastInsertId()
             ]);
             break;
             
         case 'PUT':
-            // Update existing user
+            // Update existing company
             validateRequiredFields(['id'], $data);
             
-            // Verify user exists
-            $stmt = $conn->prepare("SELECT id, company_id FROM users WHERE id = ?");
+            // Verify company exists
+            $stmt = $conn->prepare("SELECT id FROM companies WHERE id = ?");
             $stmt->execute([$data['id']]);
-            $existingUser = $stmt->fetch();
-            
-            if (!$existingUser) {
+            if (!$stmt->fetch()) {
                 sendResponse(404, [
                     'error' => true,
-                    'message' => 'User not found'
+                    'message' => 'Company not found'
                 ]);
             }
             
@@ -199,7 +161,7 @@ try {
             }
             if (isset($data['email'])) {
                 // Check if new email already exists
-                $stmt = $conn->prepare("SELECT id FROM users WHERE email = ? AND id != ?");
+                $stmt = $conn->prepare("SELECT id FROM companies WHERE email = ? AND id != ?");
                 $stmt->execute([$data['email'], $data['id']]);
                 if ($stmt->fetch()) {
                     sendResponse(400, [
@@ -214,23 +176,6 @@ try {
                 $updates[] = "password = ?";
                 $params[] = password_hash($data['password'], PASSWORD_DEFAULT);
             }
-            if (isset($data['role'])) {
-                $updates[] = "role = ?";
-                $params[] = $data['role'];
-            }
-            if (isset($data['office_id'])) {
-                // Validate office belongs to user's company
-                $stmt = $conn->prepare("SELECT id FROM offices WHERE id = ? AND company_id = ?");
-                $stmt->execute([$data['office_id'], $existingUser['company_id']]);
-                if (!$stmt->fetch()) {
-                    sendResponse(400, [
-                        'error' => true,
-                        'message' => 'Invalid office ID or office does not belong to the user\'s company'
-                    ]);
-                }
-                $updates[] = "office_id = ?";
-                $params[] = $data['office_id'];
-            }
             
             if (empty($updates)) {
                 sendResponse(400, [
@@ -242,7 +187,7 @@ try {
             $params[] = $data['id'];
             
             $stmt = $conn->prepare("
-                UPDATE users 
+                UPDATE companies 
                 SET " . implode(", ", $updates) . "
                 WHERE id = ?
             ");
@@ -250,29 +195,29 @@ try {
             
             sendResponse(200, [
                 'success' => true,
-                'message' => 'User updated successfully'
+                'message' => 'Company updated successfully'
             ]);
             break;
             
         case 'DELETE':
-            // Delete user
+            // Delete company
             validateRequiredFields(['id'], $data);
             
-            // Verify user exists
-            $stmt = $conn->prepare("SELECT id FROM users WHERE id = ?");
+            // Verify company exists
+            $stmt = $conn->prepare("SELECT id FROM companies WHERE id = ?");
             $stmt->execute([$data['id']]);
             if (!$stmt->fetch()) {
                 sendResponse(404, [
                     'error' => true,
-                    'message' => 'User not found'
+                    'message' => 'Company not found'
                 ]);
             }
             
-            // Check if user has any active bookings
+            // Check if company has any active users
             $stmt = $conn->prepare("
                 SELECT COUNT(*) as count 
-                FROM bookings 
-                WHERE user_id = ? AND status != 'completed'
+                FROM users 
+                WHERE company_id = ?
             ");
             $stmt->execute([$data['id']]);
             $result = $stmt->fetch();
@@ -280,16 +225,32 @@ try {
             if ($result['count'] > 0) {
                 sendResponse(400, [
                     'error' => true,
-                    'message' => 'Cannot delete user with active bookings'
+                    'message' => 'Cannot delete company with active users'
                 ]);
             }
             
-            $stmt = $conn->prepare("DELETE FROM users WHERE id = ?");
+            // Check if company has any active bookings
+            $stmt = $conn->prepare("
+                SELECT COUNT(*) as count 
+                FROM bookings 
+                WHERE company_id = ? AND status != 'completed'
+            ");
+            $stmt->execute([$data['id']]);
+            $result = $stmt->fetch();
+            
+            if ($result['count'] > 0) {
+                sendResponse(400, [
+                    'error' => true,
+                    'message' => 'Cannot delete company with active bookings'
+                ]);
+            }
+            
+            $stmt = $conn->prepare("DELETE FROM companies WHERE id = ?");
             $stmt->execute([$data['id']]);
             
             sendResponse(200, [
                 'success' => true,
-                'message' => 'User deleted successfully'
+                'message' => 'Company deleted successfully'
             ]);
             break;
             
@@ -301,7 +262,7 @@ try {
             break;
     }
 } catch (Exception $e) {
-    error_log("Error in users/manage.php: " . $e->getMessage());
+    error_log("Error in companies/manage.php: " . $e->getMessage());
     sendResponse(500, [
         'error' => true,
         'message' => 'Internal server error'

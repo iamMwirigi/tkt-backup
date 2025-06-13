@@ -120,7 +120,6 @@ try {
                         b.booked_at,
                         u.name as user_name,
                         u.email as user_email,
-                        u.phone as user_phone,
                         tr.trip_code,
                         tr.status as trip_status,
                         tr.departure_time,

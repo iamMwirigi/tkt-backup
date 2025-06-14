@@ -45,9 +45,9 @@ try {
     $stmt = $conn->prepare("
         SELECT 
             COUNT(*) as total_tickets,
-            SUM(CASE WHEN status = 'paid' THEN 1 ELSE 0 END) as paid_tickets,
-            SUM(CASE WHEN status = 'unpaid' THEN 1 ELSE 0 END) as unpaid_tickets,
-            COALESCE(SUM(CASE WHEN status = 'paid' THEN fare_amount ELSE 0 END), 0) as total_sales
+            SUM(CASE WHEN t.status = 'paid' THEN 1 ELSE 0 END) as paid_tickets,
+            SUM(CASE WHEN t.status = 'unpaid' THEN 1 ELSE 0 END) as unpaid_tickets,
+            COALESCE(SUM(CASE WHEN t.status = 'paid' THEN fare_amount ELSE 0 END), 0) as total_sales
         FROM tickets t
         LEFT JOIN bookings b ON t.booking_id = b.id
         WHERE t.company_id = ? AND $date_where
@@ -59,12 +59,12 @@ try {
     $stmt = $conn->prepare("
         SELECT 
             COUNT(*) as total_bookings,
-            SUM(CASE WHEN status = 'cancelled' THEN 1 ELSE 0 END) as cancelled_bookings,
-            SUM(CASE WHEN status = 'booked' THEN 1 ELSE 0 END) as active_bookings,
-            SUM(CASE WHEN status = 'converted' THEN 1 ELSE 0 END) as converted_bookings,
-            COALESCE(SUM(CASE WHEN status = 'booked' THEN fare_amount ELSE 0 END), 0) as total_booking_amount
-        FROM bookings
-        WHERE company_id = ? AND $date_where
+            SUM(CASE WHEN b.status = 'cancelled' THEN 1 ELSE 0 END) as cancelled_bookings,
+            SUM(CASE WHEN b.status = 'booked' THEN 1 ELSE 0 END) as active_bookings,
+            SUM(CASE WHEN b.status = 'converted' THEN 1 ELSE 0 END) as converted_bookings,
+            COALESCE(SUM(CASE WHEN b.status = 'booked' THEN fare_amount ELSE 0 END), 0) as total_booking_amount
+        FROM bookings b
+        WHERE b.company_id = ? AND $date_where
     ");
     $stmt->execute(array_merge([$company_id], $date_params));
     $booking_stats = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -73,11 +73,11 @@ try {
     $stmt = $conn->prepare("
         SELECT 
             COUNT(*) as total_trips,
-            SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END) as pending_trips,
-            SUM(CASE WHEN status = 'in_progress' THEN 1 ELSE 0 END) as in_progress_trips,
-            SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) as completed_trips
-        FROM trips
-        WHERE company_id = ? AND $date_where
+            SUM(CASE WHEN tr.status = 'pending' THEN 1 ELSE 0 END) as pending_trips,
+            SUM(CASE WHEN tr.status = 'in_progress' THEN 1 ELSE 0 END) as in_progress_trips,
+            SUM(CASE WHEN tr.status = 'completed' THEN 1 ELSE 0 END) as completed_trips
+        FROM trips tr
+        WHERE tr.company_id = ? AND $date_where
     ");
     $stmt->execute(array_merge([$company_id], $date_params));
     $trip_stats = $stmt->fetch(PDO::FETCH_ASSOC);

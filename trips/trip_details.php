@@ -4,11 +4,14 @@ require_once __DIR__ . '/../utils/functions.php';
 
 header('Content-Type: application/json');
 
-// Get company_id from either GET parameters or request body
+// Get company_id and trip_id from either GET parameters or request body
 $company_id = $_GET['company_id'] ?? null;
-if (!$company_id) {
+$trip_id = $_GET['trip_id'] ?? null;
+
+if (!$company_id || !$trip_id) {
     $data = json_decode(file_get_contents('php://input'), true);
-    $company_id = $data['company_id'] ?? null;
+    $company_id = $company_id ?? ($data['company_id'] ?? null);
+    $trip_id = $trip_id ?? ($data['trip_id'] ?? null);
 }
 
 // Validate company_id
@@ -20,7 +23,6 @@ if (!$company_id) {
 }
 
 // Validate trip_id
-$trip_id = $_GET['trip_id'] ?? null;
 if (!$trip_id) {
     sendResponse(400, [
         'error' => true,

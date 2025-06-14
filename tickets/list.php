@@ -95,7 +95,7 @@ try {
         }
         
         if (isset($_GET['date'])) {
-            $where[] = 'DATE(t.created_at) = ?';
+            $where[] = 'DATE(t.issued_at) = ?';
             $params[] = $_GET['date'];
         }
         
@@ -125,7 +125,7 @@ try {
             LEFT JOIN users u ON t.officer_id = u.id
             LEFT JOIN offenses o ON t.offense_id = o.id
             WHERE $where_clause
-            ORDER BY t.created_at DESC
+            ORDER BY t.issued_at DESC
         ");
         $stmt->execute($params);
         $tickets = $stmt->fetchAll(PDO::FETCH_ASSOC);

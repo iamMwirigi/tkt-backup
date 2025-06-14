@@ -4,8 +4,15 @@ require_once __DIR__ . '/../utils/functions.php';
 
 header('Content-Type: application/json');
 
+// Get company_id from either GET parameters or request body
+$company_id = $_GET['company_id'] ?? null;
+if (!$company_id) {
+    $data = json_decode(file_get_contents('php://input'), true);
+    $company_id = $data['company_id'] ?? null;
+}
+
 // Validate company_id
-if (!isset($_GET['company_id'])) {
+if (!$company_id) {
     sendResponse(400, [
         'error' => true,
         'message' => 'company_id is required'
@@ -18,7 +25,7 @@ try {
     
     // Verify company exists
     $stmt = $conn->prepare("SELECT id FROM companies WHERE id = ?");
-    $stmt->execute([$_GET['company_id']]);
+    $stmt->execute([$company_id]);
     if (!$stmt->fetch()) {
         sendResponse(404, [
             'error' => true,
@@ -48,7 +55,7 @@ try {
             LEFT JOIN offenses o ON t.offense_id = o.id
             WHERE t.id = ? AND t.company_id = ?
         ");
-        $stmt->execute([$_GET['id'], $_GET['company_id']]);
+        $stmt->execute([$_GET['id'], $company_id]);
         $ticket = $stmt->fetch(PDO::FETCH_ASSOC);
         
         if (!$ticket) {
@@ -65,7 +72,7 @@ try {
     } else {
         // Get all tickets with filters
         $where = ['t.company_id = ?'];
-        $params = [$_GET['company_id']];
+        $params = [$company_id];
         
         if (isset($_GET['vehicle_id'])) {
             $where[] = 't.vehicle_id = ?';

@@ -4,8 +4,15 @@ require_once __DIR__ . '/../utils/functions.php';
 
 header('Content-Type: application/json');
 
+// Get company_id from either GET parameters or request body
+$company_id = $_GET['company_id'] ?? null;
+if (!$company_id) {
+    $data = json_decode(file_get_contents('php://input'), true);
+    $company_id = $data['company_id'] ?? null;
+}
+
 // Validate company_id
-if (!isset($_GET['company_id'])) {
+if (!$company_id) {
     sendResponse(400, [
         'error' => true,
         'message' => 'company_id is required'
@@ -18,7 +25,7 @@ try {
     
     // Verify company exists
     $stmt = $conn->prepare("SELECT id FROM companies WHERE id = ?");
-    $stmt->execute([$_GET['company_id']]);
+    $stmt->execute([$company_id]);
     if (!$stmt->fetch()) {
         sendResponse(404, [
             'error' => true,
@@ -46,7 +53,7 @@ try {
             LEFT JOIN users u ON b.user_id = u.id
             WHERE b.id = ? AND b.company_id = ?
         ");
-        $stmt->execute([$_GET['id'], $_GET['company_id']]);
+        $stmt->execute([$_GET['id'], $company_id]);
         $booking = $stmt->fetch(PDO::FETCH_ASSOC);
         
         if (!$booking) {
@@ -63,7 +70,7 @@ try {
     } else {
         // Get all bookings with filters
         $where = ['b.company_id = ?'];
-        $params = [$_GET['company_id']];
+        $params = [$company_id];
         
         if (isset($_GET['trip_id'])) {
             $where[] = 'b.trip_id = ?';

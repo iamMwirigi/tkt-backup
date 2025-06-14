@@ -38,7 +38,7 @@ try {
     $end_date = $_GET['end_date'] ?? $start_date;
     
     // Base where clause for date filtering
-    $date_where = "DATE(t.created_at) BETWEEN ? AND ?";
+    $date_where = "DATE(t.timestamp) BETWEEN ? AND ?";
     $date_params = [$start_date, $end_date];
     
     // 1. Ticket Statistics
@@ -64,7 +64,7 @@ try {
             SUM(CASE WHEN b.status = 'converted' THEN 1 ELSE 0 END) as converted_bookings,
             COALESCE(SUM(CASE WHEN b.status = 'booked' THEN fare_amount ELSE 0 END), 0) as total_booking_amount
         FROM bookings b
-        WHERE b.company_id = ? AND DATE(b.created_at) BETWEEN ? AND ?
+        WHERE b.company_id = ? AND DATE(b.timestamp) BETWEEN ? AND ?
     ");
     $stmt->execute(array_merge([$company_id], $date_params));
     $booking_stats = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -77,7 +77,7 @@ try {
             SUM(CASE WHEN tr.status = 'in_progress' THEN 1 ELSE 0 END) as in_progress_trips,
             SUM(CASE WHEN tr.status = 'completed' THEN 1 ELSE 0 END) as completed_trips
         FROM trips tr
-        WHERE tr.company_id = ? AND DATE(tr.created_at) BETWEEN ? AND ?
+        WHERE tr.company_id = ? AND DATE(tr.timestamp) BETWEEN ? AND ?
     ");
     $stmt->execute(array_merge([$company_id], $date_params));
     $trip_stats = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -94,7 +94,7 @@ try {
         LEFT JOIN users u ON o.id = u.office_id
         LEFT JOIN tickets t ON u.id = t.officer_id
         LEFT JOIN bookings b ON t.booking_id = b.id
-        WHERE o.company_id = ? AND (DATE(t.created_at) BETWEEN ? AND ? OR t.id IS NULL)
+        WHERE o.company_id = ? AND (DATE(t.timestamp) BETWEEN ? AND ? OR t.id IS NULL)
         GROUP BY o.id, o.name
     ");
     $stmt->execute(array_merge([$company_id], $date_params));

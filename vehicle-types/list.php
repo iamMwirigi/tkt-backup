@@ -27,39 +27,78 @@ require_once __DIR__ . '/../utils/functions.php';
 
 header('Content-Type: application/json');
 
-// Use dummy values for testing
-$user_id = 1;
-$company_id = 1;
-$user_role = 'admin';
+// Validate company_id
+if (!isset($_GET['company_id'])) {
+    sendResponse(400, [
+        'error' => true,
+        'message' => 'company_id is required'
+    ]);
+}
 
 try {
     $db = new Database();
     $conn = $db->getConnection();
-
-    // Get all vehicle types for the company
-    $stmt = $conn->prepare("
-        SELECT 
-            vt.*,
-            (
-                SELECT COUNT(*) 
-                FROM vehicles v 
-                WHERE v.vehicle_type_id = vt.id
-            ) as vehicle_count
-        FROM vehicle_types vt
-        WHERE vt.company_id = ?
-        ORDER BY vt.name ASC
-    ");
-    $stmt->execute([$company_id]);
-    $vehicle_types = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-    sendResponse(200, [
-        'success' => true,
-        'message' => 'Vehicle types retrieved successfully',
-        'data' => [
+    
+    // Verify company exists
+    $stmt = $conn->prepare("SELECT id FROM companies WHERE id = ?");
+    $stmt->execute([$_GET['company_id']]);
+    if (!$stmt->fetch()) {
+        sendResponse(404, [
+            'error' => true,
+            'message' => 'Company not found'
+        ]);
+    }
+    
+    if (isset($_GET['id'])) {
+        // Get single vehicle type
+        $stmt = $conn->prepare("
+            SELECT vt.*, c.name as company_name 
+            FROM vehicle_types vt
+            LEFT JOIN companies c ON vt.company_id = c.id
+            WHERE vt.id = ? AND vt.company_id = ?
+        ");
+        $stmt->execute([$_GET['id'], $_GET['company_id']]);
+        $vehicle_type = $stmt->fetch(PDO::FETCH_ASSOC);
+        
+        if (!$vehicle_type) {
+            sendResponse(404, [
+                'error' => true,
+                'message' => 'Vehicle type not found or does not belong to your company'
+            ]);
+        }
+        
+        sendResponse(200, [
+            'success' => true,
+            'vehicle_type' => $vehicle_type
+        ]);
+    } else {
+        // Get all vehicle types with filters
+        $where = ['vt.company_id = ?'];
+        $params = [$_GET['company_id']];
+        
+        if (isset($_GET['name'])) {
+            $where[] = 'vt.name LIKE ?';
+            $params[] = '%' . $_GET['name'] . '%';
+        }
+        
+        $where_clause = implode(' AND ', $where);
+        
+        $stmt = $conn->prepare("
+            SELECT vt.*, c.name as company_name 
+            FROM vehicle_types vt
+            LEFT JOIN companies c ON vt.company_id = c.id
+            WHERE $where_clause
+            ORDER BY vt.name ASC
+        ");
+        $stmt->execute($params);
+        $vehicle_types = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        
+        sendResponse(200, [
+            'success' => true,
             'vehicle_types' => $vehicle_types
-        ]
-    ]);
-
+        ]);
+    }
+    
 } catch (Exception $e) {
     sendResponse(400, [
         'error' => true,

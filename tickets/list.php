@@ -106,6 +106,19 @@ try {
         
         $where_clause = implode(' AND ', $where);
         
+        // Get ticket statistics
+        $stmt = $conn->prepare("
+            SELECT 
+                COUNT(*) as total_tickets,
+                SUM(CASE WHEN status = 'paid' THEN 1 ELSE 0 END) as paid_tickets,
+                SUM(CASE WHEN status = 'unpaid' THEN 1 ELSE 0 END) as unpaid_tickets
+            FROM tickets t
+            WHERE $where_clause
+        ");
+        $stmt->execute($params);
+        $stats = $stmt->fetch(PDO::FETCH_ASSOC);
+        
+        // Get tickets with details
         $stmt = $conn->prepare("
             SELECT 
                 t.*,
@@ -132,6 +145,11 @@ try {
         
         sendResponse(200, [
             'success' => true,
+            'statistics' => [
+                'total_tickets' => (int)$stats['total_tickets'],
+                'paid_tickets' => (int)$stats['paid_tickets'],
+                'unpaid_tickets' => (int)$stats['unpaid_tickets']
+            ],
             'tickets' => $tickets
         ]);
     }

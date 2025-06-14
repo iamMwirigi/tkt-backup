@@ -45,7 +45,7 @@ try {
                 d.name as destination_name,
                 r.name as route_name,
                 u.name as officer_name,
-                o.name as offense_name
+                o.title as offense_name
             FROM tickets t
             LEFT JOIN vehicles v ON t.vehicle_id = v.id
             LEFT JOIN trips tr ON t.trip_id = tr.id
@@ -116,7 +116,7 @@ try {
                 d.name as destination_name,
                 r.name as route_name,
                 u.name as officer_name,
-                o.name as offense_name
+                o.title as offense_name
             FROM tickets t
             LEFT JOIN vehicles v ON t.vehicle_id = v.id
             LEFT JOIN trips tr ON t.trip_id = tr.id

@@ -14,6 +14,18 @@ try {
     $status = $_GET['status'] ?? null;
     $search = $_GET['search'] ?? null;
     
+    // Verify company exists if company_id is provided
+    if ($company_id) {
+        $stmt = $conn->prepare("SELECT id FROM companies WHERE id = ?");
+        $stmt->execute([$company_id]);
+        if (!$stmt->fetch()) {
+            sendResponse(404, [
+                'error' => true,
+                'message' => 'Company not found'
+            ]);
+        }
+    }
+    
     // Build query
     $query = "
         SELECT 

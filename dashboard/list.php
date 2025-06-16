@@ -168,6 +168,63 @@ try {
     $stmt->execute([$company_id]);
     $fare_stats = $stmt->fetch(PDO::FETCH_ASSOC);
     
+    // 6. Revenue Statistics
+    $stmt = $conn->prepare("
+        SELECT 
+            COUNT(*) as total_deliveries,
+            SUM(total_tickets) as total_tickets,
+            SUM(gross_amount) as total_gross_amount,
+            SUM(net_amount) as total_net_amount,
+            SUM(gross_amount - net_amount) as total_deductions
+        FROM deliveries 
+        WHERE company_id = ? AND DATE(created_at) BETWEEN ? AND ?
+    ");
+    $stmt->execute(array_merge([$company_id], $date_params));
+    $revenue_stats = $stmt->fetch(PDO::FETCH_ASSOC);
+    
+    // Get deductions breakdown
+    $stmt = $conn->prepare("
+        SELECT 
+            JSON_EXTRACT(deductions, '$[*].type') as deduction_types,
+            JSON_EXTRACT(deductions, '$[*].amount') as deduction_amounts
+        FROM deliveries 
+        WHERE company_id = ? AND DATE(created_at) BETWEEN ? AND ?
+        AND deductions IS NOT NULL
+    ");
+    $stmt->execute(array_merge([$company_id], $date_params));
+    $deductions_data = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    
+    // Process deductions data
+    $deductions_breakdown = [];
+    foreach ($deductions_data as $row) {
+        $types = json_decode($row['deduction_types'], true);
+        $amounts = json_decode($row['deduction_amounts'], true);
+        
+        if ($types && $amounts) {
+            foreach ($types as $index => $type) {
+                if (!isset($deductions_breakdown[$type])) {
+                    $deductions_breakdown[$type] = 0;
+                }
+                $deductions_breakdown[$type] += floatval($amounts[$index]);
+            }
+        }
+    }
+    
+    // Get daily revenue for chart
+    $stmt = $conn->prepare("
+        SELECT 
+            DATE(created_at) as date,
+            SUM(gross_amount) as gross_amount,
+            SUM(net_amount) as net_amount,
+            SUM(gross_amount - net_amount) as deductions
+        FROM deliveries 
+        WHERE company_id = ? AND DATE(created_at) BETWEEN ? AND ?
+        GROUP BY DATE(created_at)
+        ORDER BY date ASC
+    ");
+    $stmt->execute(array_merge([$company_id], $date_params));
+    $daily_revenue = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    
     // Combine all statistics
     $statistics = [
         'filters' => array_filter($filters),
@@ -195,6 +252,15 @@ try {
             'total_amount' => (float)$fare_stats['total_fare_amount'],
             'total_destinations' => (int)$fare_stats['total_destinations'],
             'total_routes' => (int)$fare_stats['total_routes']
+        ],
+        'revenue' => [
+            'total_deliveries' => (int)$revenue_stats['total_deliveries'],
+            'total_tickets' => (int)$revenue_stats['total_tickets'],
+            'total_gross_amount' => (float)$revenue_stats['total_gross_amount'],
+            'total_net_amount' => (float)$revenue_stats['total_net_amount'],
+            'total_deductions' => (float)$revenue_stats['total_deductions'],
+            'deductions_breakdown' => $deductions_breakdown,
+            'daily_revenue' => $daily_revenue
         ],
         'offices' => array_map(function($office) {
             return [

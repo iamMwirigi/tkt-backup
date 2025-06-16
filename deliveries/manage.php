@@ -68,7 +68,7 @@ try {
                 // Create a default user if it doesn't exist
                 $stmt = $conn->prepare("
                     INSERT INTO users (company_id, name, email, password, role) 
-                    VALUES (?, 'System User', 'system@example.com', ?, 'user')
+                    VALUES (?, 'System User', 'system@example.com', ?, 'clerk')
                 ");
                 $stmt->execute([
                     $data['company_id'],

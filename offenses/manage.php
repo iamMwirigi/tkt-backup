@@ -7,14 +7,6 @@ header('Content-Type: application/json');
 // Get request data
 $data = json_decode(file_get_contents('php://input'), true);
 
-// Validate action
-if (!isset($data['action']) || !in_array($data['action'], ['create', 'update', 'delete'])) {
-    sendResponse(400, [
-        'error' => true,
-        'message' => 'Invalid action. Must be one of: create, update, delete'
-    ]);
-}
-
 try {
     $db = new Database();
     $conn = $db->getConnection();
@@ -29,8 +21,8 @@ try {
         ]);
     }
     
-    switch ($data['action']) {
-        case 'create':
+    switch ($_SERVER['REQUEST_METHOD']) {
+        case 'POST':
             // Validate required fields
             $required_fields = ['company_id', 'title', 'description', 'fine_amount'];
             foreach ($required_fields as $field) {
@@ -40,14 +32,6 @@ try {
                         'message' => "$field is required"
                     ]);
                 }
-            }
-            
-            // Validate fine_amount is numeric and positive
-            if (!is_numeric($data['fine_amount']) || $data['fine_amount'] <= 0) {
-                sendResponse(400, [
-                    'error' => true,
-                    'message' => 'fine_amount must be a positive number'
-                ]);
             }
             
             // Insert new offense
@@ -73,10 +57,11 @@ try {
             $stmt = $conn->prepare("
                 SELECT 
                     id,
+                    company_id,
                     title,
                     description,
                     fine_amount
-                FROM offenses 
+                FROM offenses
                 WHERE id = ?
             ");
             $stmt->execute([$offense_id]);
@@ -91,9 +76,9 @@ try {
             ]);
             break;
             
-        case 'update':
+        case 'PUT':
             // Validate required fields
-            $required_fields = ['company_id', 'id', 'title', 'description', 'fine_amount'];
+            $required_fields = ['company_id', 'id'];
             foreach ($required_fields as $field) {
                 if (!isset($data[$field]) || empty($data[$field])) {
                     sendResponse(400, [
@@ -103,15 +88,7 @@ try {
                 }
             }
             
-            // Validate fine_amount is numeric and positive
-            if (!is_numeric($data['fine_amount']) || $data['fine_amount'] <= 0) {
-                sendResponse(400, [
-                    'error' => true,
-                    'message' => 'fine_amount must be a positive number'
-                ]);
-            }
-            
-            // Verify offense exists and belongs to company
+            // Check if offense exists and belongs to company
             $stmt = $conn->prepare("
                 SELECT id 
                 FROM offenses 
@@ -125,32 +102,52 @@ try {
                 ]);
             }
             
+            // Build update query dynamically based on provided fields
+            $update_fields = [];
+            $params = [];
+            
+            $allowed_fields = [
+                'title',
+                'description',
+                'fine_amount'
+            ];
+            
+            foreach ($allowed_fields as $field) {
+                if (isset($data[$field])) {
+                    $update_fields[] = "$field = ?";
+                    $params[] = $data[$field];
+                }
+            }
+            
+            if (empty($update_fields)) {
+                sendResponse(400, [
+                    'error' => true,
+                    'message' => 'No fields to update'
+                ]);
+            }
+            
+            // Add id and company_id to params
+            $params[] = $data['id'];
+            $params[] = $data['company_id'];
+            
             // Update offense
             $stmt = $conn->prepare("
                 UPDATE offenses 
-                SET 
-                    title = ?,
-                    description = ?,
-                    fine_amount = ?
+                SET " . implode(', ', $update_fields) . "
                 WHERE id = ? AND company_id = ?
             ");
             
-            $stmt->execute([
-                $data['title'],
-                $data['description'],
-                $data['fine_amount'],
-                $data['id'],
-                $data['company_id']
-            ]);
+            $stmt->execute($params);
             
             // Get the updated offense
             $stmt = $conn->prepare("
                 SELECT 
                     id,
+                    company_id,
                     title,
                     description,
                     fine_amount
-                FROM offenses 
+                FROM offenses
                 WHERE id = ?
             ");
             $stmt->execute([$data['id']]);
@@ -165,7 +162,7 @@ try {
             ]);
             break;
             
-        case 'delete':
+        case 'DELETE':
             // Validate required fields
             $required_fields = ['company_id', 'id'];
             foreach ($required_fields as $field) {
@@ -177,7 +174,7 @@ try {
                 }
             }
             
-            // Verify offense exists and belongs to company
+            // Check if offense exists and belongs to company
             $stmt = $conn->prepare("
                 SELECT id 
                 FROM offenses 
@@ -188,22 +185,6 @@ try {
                 sendResponse(404, [
                     'error' => true,
                     'message' => 'Offense not found or does not belong to company'
-                ]);
-            }
-            
-            // Check if offense is being used in any tickets
-            $stmt = $conn->prepare("
-                SELECT COUNT(*) as count 
-                FROM tickets 
-                WHERE offense_id = ?
-            ");
-            $stmt->execute([$data['id']]);
-            $result = $stmt->fetch(PDO::FETCH_ASSOC);
-            
-            if ($result['count'] > 0) {
-                sendResponse(400, [
-                    'error' => true,
-                    'message' => 'Cannot delete offense as it is being used in tickets'
                 ]);
             }
             
@@ -218,6 +199,13 @@ try {
             sendResponse(200, [
                 'success' => true,
                 'message' => 'Offense deleted successfully'
+            ]);
+            break;
+            
+        default:
+            sendResponse(405, [
+                'error' => true,
+                'message' => 'Method not allowed'
             ]);
             break;
     }

@@ -7,14 +7,6 @@ header('Content-Type: application/json');
 // Get request data
 $data = json_decode(file_get_contents('php://input'), true);
 
-// Validate action
-if (!isset($data['action']) || !in_array($data['action'], ['create', 'update', 'delete'])) {
-    sendResponse(400, [
-        'error' => true,
-        'message' => 'Invalid action. Must be one of: create, update, delete'
-    ]);
-}
-
 try {
     $db = new Database();
     $conn = $db->getConnection();
@@ -29,10 +21,10 @@ try {
         ]);
     }
     
-    switch ($data['action']) {
-        case 'create':
+    switch ($_SERVER['REQUEST_METHOD']) {
+        case 'POST':
             // Validate required fields
-            $required_fields = ['company_id', 'vehicle_id', 'route', 'total_tickets', 'gross_amount', 'deductions', 'net_amount', 'created_by'];
+            $required_fields = ['company_id', 'vehicle_id', 'route', 'total_tickets', 'gross_amount', 'net_amount', 'created_by'];
             foreach ($required_fields as $field) {
                 if (!isset($data[$field]) || empty($data[$field])) {
                     sendResponse(400, [
@@ -42,39 +34,32 @@ try {
                 }
             }
             
-            // Validate numeric fields
-            $numeric_fields = ['total_tickets', 'gross_amount', 'net_amount'];
-            foreach ($numeric_fields as $field) {
-                if (!is_numeric($data[$field]) || $data[$field] < 0) {
-                    sendResponse(400, [
-                        'error' => true,
-                        'message' => "$field must be a positive number"
-                    ]);
-                }
-            }
-            
-            // Validate deductions JSON
-            if (!is_array($data['deductions'])) {
-                sendResponse(400, [
-                    'error' => true,
-                    'message' => 'deductions must be an array'
-                ]);
-            }
-            
-            // Check if user exists, if not create one
-            $stmt = $conn->prepare("SELECT id FROM users WHERE id = ?");
-            $stmt->execute([$data['created_by']]);
+            // Verify vehicle belongs to company
+            $stmt = $conn->prepare("
+                SELECT id 
+                FROM vehicles 
+                WHERE id = ? AND company_id = ?
+            ");
+            $stmt->execute([$data['vehicle_id'], $data['company_id']]);
             if (!$stmt->fetch()) {
-                // Create a default user if it doesn't exist
-                $stmt = $conn->prepare("
-                    INSERT INTO users (company_id, name, email, password, role) 
-                    VALUES (?, 'System User', 'system@example.com', ?, 'clerk')
-                ");
-                $stmt->execute([
-                    $data['company_id'],
-                    password_hash('system123', PASSWORD_DEFAULT)
+                sendResponse(404, [
+                    'error' => true,
+                    'message' => 'Vehicle not found or does not belong to company'
                 ]);
-                $data['created_by'] = $conn->lastInsertId();
+            }
+            
+            // Verify user exists and belongs to company
+            $stmt = $conn->prepare("
+                SELECT id 
+                FROM users 
+                WHERE id = ? AND company_id = ?
+            ");
+            $stmt->execute([$data['created_by'], $data['company_id']]);
+            if (!$stmt->fetch()) {
+                sendResponse(404, [
+                    'error' => true,
+                    'message' => 'User not found or does not belong to company'
+                ]);
             }
             
             // Insert new delivery
@@ -97,7 +82,7 @@ try {
                 $data['route'],
                 $data['total_tickets'],
                 $data['gross_amount'],
-                json_encode($data['deductions']),
+                json_encode($data['deductions'] ?? []),
                 $data['net_amount'],
                 $data['created_by']
             ]);
@@ -108,6 +93,7 @@ try {
             $stmt = $conn->prepare("
                 SELECT 
                     d.id,
+                    d.company_id,
                     d.vehicle_id,
                     v.plate_number,
                     d.route,
@@ -126,10 +112,6 @@ try {
             $stmt->execute([$delivery_id]);
             $delivery = $stmt->fetch(PDO::FETCH_ASSOC);
             
-            if ($delivery['deductions']) {
-                $delivery['deductions'] = json_decode($delivery['deductions'], true);
-            }
-            
             sendResponse(201, [
                 'success' => true,
                 'message' => 'Delivery created successfully',
@@ -139,9 +121,9 @@ try {
             ]);
             break;
             
-        case 'update':
+        case 'PUT':
             // Validate required fields
-            $required_fields = ['company_id', 'id', 'vehicle_id', 'route', 'total_tickets', 'gross_amount', 'deductions', 'net_amount'];
+            $required_fields = ['company_id', 'id'];
             foreach ($required_fields as $field) {
                 if (!isset($data[$field]) || empty($data[$field])) {
                     sendResponse(400, [
@@ -151,26 +133,7 @@ try {
                 }
             }
             
-            // Validate numeric fields
-            $numeric_fields = ['total_tickets', 'gross_amount', 'net_amount'];
-            foreach ($numeric_fields as $field) {
-                if (!is_numeric($data[$field]) || $data[$field] < 0) {
-                    sendResponse(400, [
-                        'error' => true,
-                        'message' => "$field must be a positive number"
-                    ]);
-                }
-            }
-            
-            // Validate deductions JSON
-            if (!is_array($data['deductions'])) {
-                sendResponse(400, [
-                    'error' => true,
-                    'message' => 'deductions must be an array'
-                ]);
-            }
-            
-            // Verify delivery exists and belongs to company
+            // Check if delivery exists and belongs to company
             $stmt = $conn->prepare("
                 SELECT id 
                 FROM deliveries 
@@ -184,34 +147,72 @@ try {
                 ]);
             }
             
+            // If vehicle_id is being updated, verify it belongs to company
+            if (isset($data['vehicle_id'])) {
+                $stmt = $conn->prepare("
+                    SELECT id 
+                    FROM vehicles 
+                    WHERE id = ? AND company_id = ?
+                ");
+                $stmt->execute([$data['vehicle_id'], $data['company_id']]);
+                if (!$stmt->fetch()) {
+                    sendResponse(404, [
+                        'error' => true,
+                        'message' => 'Vehicle not found or does not belong to company'
+                    ]);
+                }
+            }
+            
+            // Build update query dynamically based on provided fields
+            $update_fields = [];
+            $params = [];
+            
+            $allowed_fields = [
+                'vehicle_id',
+                'route',
+                'total_tickets',
+                'gross_amount',
+                'deductions',
+                'net_amount'
+            ];
+            
+            foreach ($allowed_fields as $field) {
+                if (isset($data[$field])) {
+                    if ($field === 'deductions') {
+                        $update_fields[] = "$field = ?";
+                        $params[] = json_encode($data[$field]);
+                    } else {
+                        $update_fields[] = "$field = ?";
+                        $params[] = $data[$field];
+                    }
+                }
+            }
+            
+            if (empty($update_fields)) {
+                sendResponse(400, [
+                    'error' => true,
+                    'message' => 'No fields to update'
+                ]);
+            }
+            
+            // Add id and company_id to params
+            $params[] = $data['id'];
+            $params[] = $data['company_id'];
+            
             // Update delivery
             $stmt = $conn->prepare("
                 UPDATE deliveries 
-                SET 
-                    vehicle_id = ?,
-                    route = ?,
-                    total_tickets = ?,
-                    gross_amount = ?,
-                    deductions = ?,
-                    net_amount = ?
+                SET " . implode(', ', $update_fields) . "
                 WHERE id = ? AND company_id = ?
             ");
             
-            $stmt->execute([
-                $data['vehicle_id'],
-                $data['route'],
-                $data['total_tickets'],
-                $data['gross_amount'],
-                json_encode($data['deductions']),
-                $data['net_amount'],
-                $data['id'],
-                $data['company_id']
-            ]);
+            $stmt->execute($params);
             
             // Get the updated delivery
             $stmt = $conn->prepare("
                 SELECT 
                     d.id,
+                    d.company_id,
                     d.vehicle_id,
                     v.plate_number,
                     d.route,
@@ -230,10 +231,6 @@ try {
             $stmt->execute([$data['id']]);
             $delivery = $stmt->fetch(PDO::FETCH_ASSOC);
             
-            if ($delivery['deductions']) {
-                $delivery['deductions'] = json_decode($delivery['deductions'], true);
-            }
-            
             sendResponse(200, [
                 'success' => true,
                 'message' => 'Delivery updated successfully',
@@ -243,7 +240,7 @@ try {
             ]);
             break;
             
-        case 'delete':
+        case 'DELETE':
             // Validate required fields
             $required_fields = ['company_id', 'id'];
             foreach ($required_fields as $field) {
@@ -255,7 +252,7 @@ try {
                 }
             }
             
-            // Verify delivery exists and belongs to company
+            // Check if delivery exists and belongs to company
             $stmt = $conn->prepare("
                 SELECT id 
                 FROM deliveries 
@@ -280,6 +277,13 @@ try {
             sendResponse(200, [
                 'success' => true,
                 'message' => 'Delivery deleted successfully'
+            ]);
+            break;
+            
+        default:
+            sendResponse(405, [
+                'error' => true,
+                'message' => 'Method not allowed'
             ]);
             break;
     }

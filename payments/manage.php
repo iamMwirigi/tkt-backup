@@ -7,14 +7,6 @@ header('Content-Type: application/json');
 // Get request data
 $data = json_decode(file_get_contents('php://input'), true);
 
-// Validate action
-if (!isset($data['action']) || !in_array($data['action'], ['create', 'update', 'delete'])) {
-    sendResponse(400, [
-        'error' => true,
-        'message' => 'Invalid action. Must be one of: create, update, delete'
-    ]);
-}
-
 try {
     $db = new Database();
     $conn = $db->getConnection();
@@ -29,8 +21,8 @@ try {
         ]);
     }
     
-    switch ($data['action']) {
-        case 'create':
+    switch ($_SERVER['REQUEST_METHOD']) {
+        case 'POST':
             // Validate required fields
             $required_fields = ['company_id', 'amount', 'payment_method'];
             foreach ($required_fields as $field) {
@@ -121,7 +113,7 @@ try {
             ]);
             break;
             
-        case 'update':
+        case 'PUT':
             // Validate required fields
             $required_fields = ['company_id', 'id'];
             foreach ($required_fields as $field) {
@@ -241,7 +233,7 @@ try {
             ]);
             break;
             
-        case 'delete':
+        case 'DELETE':
             // Validate required fields
             $required_fields = ['company_id', 'id'];
             foreach ($required_fields as $field) {
@@ -278,6 +270,13 @@ try {
             sendResponse(200, [
                 'success' => true,
                 'message' => 'Payment deleted successfully'
+            ]);
+            break;
+            
+        default:
+            sendResponse(405, [
+                'error' => true,
+                'message' => 'Method not allowed'
             ]);
             break;
     }

@@ -24,7 +24,7 @@ try {
     switch ($_SERVER['REQUEST_METHOD']) {
         case 'POST':
             // Validate required fields
-            $required_fields = ['company_id', 'vehicle_id', 'seat_number', 'status'];
+            $required_fields = ['company_id', 'vehicle_id', 'seat_number', 'position'];
             foreach ($required_fields as $field) {
                 if (!isset($data[$field]) || empty($data[$field])) {
                     sendResponse(400, [
@@ -65,18 +65,18 @@ try {
             // Insert new seat
             $stmt = $conn->prepare("
                 INSERT INTO vehicle_seats (
-                    company_id,
                     vehicle_id,
                     seat_number,
-                    status
+                    position,
+                    is_reserved
                 ) VALUES (?, ?, ?, ?)
             ");
             
             $stmt->execute([
-                $data['company_id'],
                 $data['vehicle_id'],
                 $data['seat_number'],
-                $data['status']
+                $data['position'],
+                $data['is_reserved'] ?? 0
             ]);
             
             $seat_id = $conn->lastInsertId();
@@ -85,11 +85,11 @@ try {
             $stmt = $conn->prepare("
                 SELECT 
                     vs.id,
-                    vs.company_id,
                     vs.vehicle_id,
                     v.plate_number,
                     vs.seat_number,
-                    vs.status,
+                    vs.position,
+                    vs.is_reserved,
                     vs.created_at
                 FROM vehicle_seats vs
                 LEFT JOIN vehicles v ON vs.vehicle_id = v.id
@@ -119,17 +119,27 @@ try {
                 }
             }
             
-            // Check if seat exists and belongs to company
+            // Check if seat exists
             $stmt = $conn->prepare("
-                SELECT id 
-                FROM vehicle_seats 
-                WHERE id = ? AND company_id = ?
+                SELECT vs.id, v.company_id
+                FROM vehicle_seats vs
+                JOIN vehicles v ON vs.vehicle_id = v.id
+                WHERE vs.id = ?
             ");
-            $stmt->execute([$data['id'], $data['company_id']]);
-            if (!$stmt->fetch()) {
+            $stmt->execute([$data['id']]);
+            $seat = $stmt->fetch(PDO::FETCH_ASSOC);
+            
+            if (!$seat) {
                 sendResponse(404, [
                     'error' => true,
-                    'message' => 'Vehicle seat not found or does not belong to company'
+                    'message' => 'Vehicle seat not found'
+                ]);
+            }
+            
+            if ($seat['company_id'] != $data['company_id']) {
+                sendResponse(404, [
+                    'error' => true,
+                    'message' => 'Vehicle seat does not belong to company'
                 ]);
             }
             
@@ -139,7 +149,8 @@ try {
             
             $allowed_fields = [
                 'seat_number',
-                'status'
+                'position',
+                'is_reserved'
             ];
             
             foreach ($allowed_fields as $field) {
@@ -156,15 +167,14 @@ try {
                 ]);
             }
             
-            // Add id and company_id to params
+            // Add id to params
             $params[] = $data['id'];
-            $params[] = $data['company_id'];
             
             // Update seat
             $stmt = $conn->prepare("
                 UPDATE vehicle_seats 
                 SET " . implode(', ', $update_fields) . "
-                WHERE id = ? AND company_id = ?
+                WHERE id = ?
             ");
             
             $stmt->execute($params);
@@ -173,11 +183,11 @@ try {
             $stmt = $conn->prepare("
                 SELECT 
                     vs.id,
-                    vs.company_id,
                     vs.vehicle_id,
                     v.plate_number,
                     vs.seat_number,
-                    vs.status,
+                    vs.position,
+                    vs.is_reserved,
                     vs.created_at
                 FROM vehicle_seats vs
                 LEFT JOIN vehicles v ON vs.vehicle_id = v.id
@@ -207,27 +217,37 @@ try {
                 }
             }
             
-            // Check if seat exists and belongs to company
+            // Check if seat exists
             $stmt = $conn->prepare("
-                SELECT id 
-                FROM vehicle_seats 
-                WHERE id = ? AND company_id = ?
+                SELECT vs.id, v.company_id
+                FROM vehicle_seats vs
+                JOIN vehicles v ON vs.vehicle_id = v.id
+                WHERE vs.id = ?
             ");
-            $stmt->execute([$data['id'], $data['company_id']]);
-            if (!$stmt->fetch()) {
+            $stmt->execute([$data['id']]);
+            $seat = $stmt->fetch(PDO::FETCH_ASSOC);
+            
+            if (!$seat) {
                 sendResponse(404, [
                     'error' => true,
-                    'message' => 'Vehicle seat not found or does not belong to company'
+                    'message' => 'Vehicle seat not found'
+                ]);
+            }
+            
+            if ($seat['company_id'] != $data['company_id']) {
+                sendResponse(404, [
+                    'error' => true,
+                    'message' => 'Vehicle seat does not belong to company'
                 ]);
             }
             
             // Delete seat
             $stmt = $conn->prepare("
                 DELETE FROM vehicle_seats 
-                WHERE id = ? AND company_id = ?
+                WHERE id = ?
             ");
             
-            $stmt->execute([$data['id'], $data['company_id']]);
+            $stmt->execute([$data['id']]);
             
             sendResponse(200, [
                 'success' => true,

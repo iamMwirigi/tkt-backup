@@ -61,6 +61,22 @@ try {
                 ]);
             }
             
+            // Check if user exists, if not create one
+            $stmt = $conn->prepare("SELECT id FROM users WHERE id = ?");
+            $stmt->execute([$data['created_by']]);
+            if (!$stmt->fetch()) {
+                // Create a default user if it doesn't exist
+                $stmt = $conn->prepare("
+                    INSERT INTO users (company_id, name, email, password, role) 
+                    VALUES (?, 'System User', 'system@example.com', ?, 'user')
+                ");
+                $stmt->execute([
+                    $data['company_id'],
+                    password_hash('system123', PASSWORD_DEFAULT)
+                ]);
+                $data['created_by'] = $conn->lastInsertId();
+            }
+            
             // Insert new delivery
             $stmt = $conn->prepare("
                 INSERT INTO deliveries (

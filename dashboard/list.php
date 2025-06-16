@@ -4,11 +4,16 @@ require_once __DIR__ . '/../utils/functions.php';
 
 header('Content-Type: application/json');
 
-// Get company_id from either GET parameters or request body
+// Get company_id and date parameters from either GET parameters or request body
 $company_id = $_GET['company_id'] ?? null;
-if (!$company_id) {
+$start_date = $_GET['start_date'] ?? null;
+$end_date = $_GET['end_date'] ?? null;
+
+if (!$company_id || !$start_date || !$end_date) {
     $data = json_decode(file_get_contents('php://input'), true);
-    $company_id = $data['company_id'] ?? null;
+    $company_id = $company_id ?? $data['company_id'] ?? null;
+    $start_date = $start_date ?? $data['start_date'] ?? date('Y-m-d');
+    $end_date = $end_date ?? $data['end_date'] ?? $start_date;
 }
 
 // Validate company_id
@@ -32,10 +37,6 @@ try {
             'message' => 'Company not found'
         ]);
     }
-    
-    // Get date filters
-    $start_date = $_GET['start_date'] ?? date('Y-m-d');
-    $end_date = $_GET['end_date'] ?? $start_date;
     
     // Base where clause for date filtering
     $date_where = "DATE(t.issued_at) BETWEEN ? AND ?";

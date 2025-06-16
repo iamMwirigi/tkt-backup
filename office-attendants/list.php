@@ -8,11 +8,14 @@ try {
     $db = new Database();
     $conn = $db->getConnection();
     
+    // Get parameters from both GET and request body
+    $request_data = json_decode(file_get_contents('php://input'), true) ?? [];
+    
     // Get query parameters
-    $company_id = $_GET['company_id'] ?? null;
-    $office_id = $_GET['office_id'] ?? null;
-    $status = $_GET['status'] ?? null;
-    $search = $_GET['search'] ?? null;
+    $company_id = $_GET['company_id'] ?? $request_data['company_id'] ?? null;
+    $office_id = $_GET['office_id'] ?? $request_data['office_id'] ?? null;
+    $status = $_GET['status'] ?? $request_data['status'] ?? null;
+    $search = $_GET['search'] ?? $request_data['search'] ?? null;
     
     // Verify company exists if company_id is provided
     if ($company_id) {

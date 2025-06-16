@@ -100,6 +100,21 @@ try {
     ");
     $stmt->execute(array_merge([$company_id], $date_params));
     $office_stats = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+    // 5. Fare Statistics
+    $stmt = $conn->prepare("
+        SELECT 
+            COUNT(*) as total_fares,
+            COALESCE(SUM(amount), 0) as total_fare_amount,
+            COUNT(DISTINCT destination_id) as total_destinations,
+            COUNT(DISTINCT r.id) as total_routes
+        FROM fares f
+        JOIN destinations d ON f.destination_id = d.id
+        JOIN routes r ON d.route_id = r.id
+        WHERE r.company_id = ?
+    ");
+    $stmt->execute([$company_id]);
+    $fare_stats = $stmt->fetch(PDO::FETCH_ASSOC);
     
     // Combine all statistics
     $statistics = [
@@ -125,6 +140,12 @@ try {
             'pending' => (int)$trip_stats['pending_trips'],
             'in_progress' => (int)$trip_stats['in_progress_trips'],
             'completed' => (int)$trip_stats['completed_trips']
+        ],
+        'fares' => [
+            'total_fares' => (int)$fare_stats['total_fares'],
+            'total_amount' => (float)$fare_stats['total_fare_amount'],
+            'total_destinations' => (int)$fare_stats['total_destinations'],
+            'total_routes' => (int)$fare_stats['total_routes']
         ],
         'offices' => array_map(function($office) {
             return [

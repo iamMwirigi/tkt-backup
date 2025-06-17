@@ -131,7 +131,7 @@ try {
             
         case 'POST':
             // Create new owner with vehicles
-            validateRequiredFields(['name', 'phone_number', 'vehicles'], $data);
+            validateRequiredFields(['name', 'phone_number', 'id_number', 'vehicles'], $data);
             
             // Validate vehicles array
             if (!is_array($data['vehicles']) || empty($data['vehicles'])) {
@@ -150,6 +150,16 @@ try {
                     'message' => 'Phone number already registered'
                 ]);
             }
+
+            // Check if ID number already exists
+            $stmt = $conn->prepare("SELECT id FROM vehicle_owners WHERE id_number = ? AND company_id = ?");
+            $stmt->execute([$data['id_number'], $data['company_id']]);
+            if ($stmt->fetch()) {
+                sendResponse(400, [
+                    'error' => true,
+                    'message' => 'ID number already registered'
+                ]);
+            }
             
             // Start transaction
             $conn->beginTransaction();
@@ -158,13 +168,14 @@ try {
                 // Create owner
                 $stmt = $conn->prepare("
                     INSERT INTO vehicle_owners (
-                        name, phone, company_id
-                    ) VALUES (?, ?, ?)
+                        name, phone, id_number, company_id
+                    ) VALUES (?, ?, ?, ?)
                 ");
                 
                 $stmt->execute([
                     $data['name'],
                     $data['phone_number'],
+                    $data['id_number'],
                     $data['company_id']
                 ]);
                 
@@ -263,7 +274,7 @@ try {
             
         case 'PUT':
             // Update owner
-            validateRequiredFields(['id'], $data);
+            validateRequiredFields(['id', 'id_number'], $data);
             
             // Verify owner exists and belongs to company
             $stmt = $conn->prepare("SELECT * FROM vehicle_owners WHERE id = ? AND company_id = ?");
@@ -288,6 +299,18 @@ try {
                     ]);
                 }
             }
+
+            // Check if new ID number already exists
+            if ($data['id_number'] !== $owner['id_number']) {
+                $stmt = $conn->prepare("SELECT id FROM vehicle_owners WHERE id_number = ? AND company_id = ? AND id != ?");
+                $stmt->execute([$data['id_number'], $data['company_id'], $data['id']]);
+                if ($stmt->fetch()) {
+                    sendResponse(400, [
+                        'error' => true,
+                        'message' => 'ID number already registered to another owner'
+                    ]);
+                }
+            }
             
             // Start transaction
             $conn->beginTransaction();
@@ -299,7 +322,8 @@ try {
                 
                 $allowed_fields = [
                     'name',
-                    'phone_number'
+                    'phone_number',
+                    'id_number'
                 ];
                 
                 foreach ($allowed_fields as $field) {

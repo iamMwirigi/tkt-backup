@@ -34,7 +34,7 @@ try {
     // Get request body
     $data = json_decode(file_get_contents('php://input'), true);
     
-    // Validate company_id
+    // Validate required fields
     if (!isset($data['company_id'])) {
         sendResponse(400, [
             'error' => true,
@@ -42,12 +42,10 @@ try {
         ]);
     }
 
-    // Get route ID from query string
-    $route_id = $_GET['id'] ?? null;
-    if (!$route_id) {
+    if (!isset($data['route_id'])) {
         sendResponse(400, [
             'error' => true,
-            'message' => 'Route ID is required'
+            'message' => 'route_id is required'
         ]);
     }
 
@@ -87,7 +85,7 @@ try {
         WHERE r.id = ? AND r.company_id = ?
         GROUP BY r.id
     ");
-    $stmt->execute([$route_id, $data['company_id']]);
+    $stmt->execute([$data['route_id'], $data['company_id']]);
     $route = $stmt->fetch(PDO::FETCH_ASSOC);
     
     if (!$route) {

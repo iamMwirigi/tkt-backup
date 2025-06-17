@@ -188,15 +188,4 @@ try {
         'error' => true,
         'message' => $e->getMessage()
     ]);
-}
-
-function validateRequiredFields($requiredFields, $data) {
-    foreach ($requiredFields as $field) {
-        if (!isset($data[$field]) || empty($data[$field])) {
-            sendResponse(400, [
-                'error' => true,
-                'message' => "Missing or empty required field: $field"
-            ]);
-        }
-    }
 } 

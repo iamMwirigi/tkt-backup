@@ -38,39 +38,61 @@ try {
                 ]);
             }
             
-            // Create configuration
-            $stmt = $conn->prepare("
-                INSERT INTO vehicle_configurations (
-                    vehicle_type,
-                    total_seats,
-                    row_count,
-                    column_count,
-                    layout
-                ) VALUES (?, ?, ?, ?, ?)
-            ");
-            
-            $stmt->execute([
-                $data['vehicle_type'],
-                $data['total_seats'],
-                $data['row_count'],
-                $data['column_count'],
-                json_encode($data['layout'])
-            ]);
-            
-            $config_id = $conn->lastInsertId();
-            
-            // Get created configuration
-            $stmt = $conn->prepare("SELECT * FROM vehicle_configurations WHERE id = ?");
-            $stmt->execute([$config_id]);
-            $config = $stmt->fetch(PDO::FETCH_ASSOC);
-            
-            sendResponse(201, [
-                'success' => true,
-                'message' => 'Vehicle configuration created successfully',
-                'data' => [
-                    'configuration' => $config
-                ]
-            ]);
+            // Check if configuration exists for this vehicle type
+            $stmt = $conn->prepare("SELECT id FROM vehicle_configurations WHERE vehicle_type = ?");
+            $stmt->execute([$data['vehicle_type']]);
+            $existing = $stmt->fetch(PDO::FETCH_ASSOC);
+
+            if ($existing) {
+                // Update existing configuration
+                $stmt = $conn->prepare("
+                    UPDATE vehicle_configurations 
+                    SET total_seats = ?,
+                        row_count = ?,
+                        column_count = ?,
+                        layout = ?
+                    WHERE vehicle_type = ?
+                ");
+                
+                $stmt->execute([
+                    $data['total_seats'],
+                    $data['row_count'],
+                    $data['column_count'],
+                    json_encode($data['layout']),
+                    $data['vehicle_type']
+                ]);
+
+                sendResponse(200, [
+                    'error' => false,
+                    'message' => 'Vehicle configuration updated successfully',
+                    'id' => $existing['id']
+                ]);
+            } else {
+                // Create new configuration
+                $stmt = $conn->prepare("
+                    INSERT INTO vehicle_configurations (
+                        vehicle_type,
+                        total_seats,
+                        row_count,
+                        column_count,
+                        layout
+                    ) VALUES (?, ?, ?, ?, ?)
+                ");
+                
+                $stmt->execute([
+                    $data['vehicle_type'],
+                    $data['total_seats'],
+                    $data['row_count'],
+                    $data['column_count'],
+                    json_encode($data['layout'])
+                ]);
+
+                sendResponse(201, [
+                    'error' => false,
+                    'message' => 'Vehicle configuration created successfully',
+                    'id' => $conn->lastInsertId()
+                ]);
+            }
             break;
             
         case 'PUT':

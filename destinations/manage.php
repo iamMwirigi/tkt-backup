@@ -60,13 +60,15 @@ try {
             try {
                 // Create destination
                 $stmt = $conn->prepare("
-                    INSERT INTO destinations (route_id, name, stop_order) 
-                    VALUES (?, ?, ?)
+                    INSERT INTO destinations (route_id, name, stop_order, minimum_fare, maximum_fare) 
+                    VALUES (?, ?, ?, ?, ?)
                 ");
                 $stmt->execute([
                     $data['route_id'],
                     $data['name'],
-                    $data['stop_order']
+                    $data['stop_order'],
+                    $data['minimum_fare'] ?? null,
+                    $data['maximum_fare'] ?? null
                 ]);
                 
                 $destination_id = $conn->lastInsertId();
@@ -155,12 +157,14 @@ try {
                 // Update destination
                 $stmt = $conn->prepare("
                     UPDATE destinations 
-                    SET name = ?, stop_order = ? 
+                    SET name = ?, stop_order = ?, minimum_fare = ?, maximum_fare = ? 
                     WHERE id = ?
                 ");
                 $stmt->execute([
                     $data['name'],
                     $data['stop_order'],
+                    $data['minimum_fare'] ?? null,
+                    $data['maximum_fare'] ?? null,
                     $data['id']
                 ]);
                 

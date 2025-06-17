@@ -47,6 +47,8 @@ try {
         SELECT d.*,
                r.name as route_name,
                r.description as route_description,
+               d.minimum_fare,
+               d.maximum_fare,
                JSON_ARRAYAGG(
                    JSON_OBJECT(
                        'id', f.id,

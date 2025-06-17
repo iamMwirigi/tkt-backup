@@ -108,13 +108,18 @@ try {
                 v.vehicle_type,
                 d.name as destination_name,
                 r.name as route_name,
-                u.name as booked_by
+                u.name as booked_by,
+                p.payment_method,
+                p.transaction_reference,
+                p.status as payment_status,
+                p.paid_at
             FROM bookings b
             LEFT JOIN trips t ON b.trip_id = t.id
             LEFT JOIN vehicles v ON b.vehicle_id = v.id
             LEFT JOIN destinations d ON b.destination_id = d.id
             LEFT JOIN routes r ON t.route_id = r.id
             LEFT JOIN users u ON b.user_id = u.id
+            LEFT JOIN payments p ON b.id = p.booking_id
             WHERE $where_clause
             ORDER BY b.booked_at DESC
         ");

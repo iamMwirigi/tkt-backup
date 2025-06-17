@@ -53,27 +53,6 @@ try {
     $stmt = $conn->prepare("
         SELECT 
             r.*,
-            JSON_ARRAYAGG(
-                JSON_OBJECT(
-                    'id', d.id,
-                    'name', d.name,
-                    'stop_order', d.stop_order,
-                    'min_fare', d.min_fare,
-                    'max_fare', d.max_fare,
-                    'current_fare', d.current_fare,
-                    'fares', (
-                        SELECT JSON_ARRAYAGG(
-                            JSON_OBJECT(
-                                'id', f.id,
-                                'label', f.label,
-                                'amount', f.amount
-                            )
-                        )
-                        FROM fares f
-                        WHERE f.destination_id = d.id
-                    )
-                )
-            ) as destinations,
             (
                 SELECT COUNT(*) 
                 FROM trips t 
@@ -81,9 +60,7 @@ try {
                 AND t.status != 'completed'
             ) as active_trips
         FROM routes r
-        LEFT JOIN destinations d ON r.id = d.route_id
         WHERE r.id = ? AND r.company_id = ?
-        GROUP BY r.id
     ");
     $stmt->execute([$data['route_id'], $data['company_id']]);
     $route = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -94,28 +71,35 @@ try {
             'message' => 'Route not found or does not belong to your company'
         ]);
     }
-    
-    // Parse destinations JSON
-    $route['destinations'] = json_decode($route['destinations'], true);
-    
-    // Remove null destinations (if route has no destinations)
-    if ($route['destinations'][0] === null) {
-        $route['destinations'] = [];
+
+    // Get destinations for this route
+    $stmt = $conn->prepare("
+        SELECT 
+            d.*,
+            (
+                SELECT JSON_ARRAYAGG(
+                    JSON_OBJECT(
+                        'id', f.id,
+                        'label', f.label,
+                        'amount', f.amount
+                    )
+                )
+                FROM fares f
+                WHERE f.destination_id = d.id
+            ) as fares
+        FROM destinations d
+        WHERE d.route_id = ?
+        ORDER BY d.stop_order ASC
+    ");
+    $stmt->execute([$data['route_id']]);
+    $destinations = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+    // Process destinations and their fares
+    foreach ($destinations as &$destination) {
+        $destination['fares'] = json_decode($destination['fares'], true) ?: [];
     }
-    
-    // Parse fares JSON for each destination
-    foreach ($route['destinations'] as &$destination) {
-        $destination['fares'] = json_decode($destination['fares'], true);
-        // Remove null fares (if a destination has no fares)
-        if ($destination['fares'][0] === null) {
-            $destination['fares'] = [];
-        }
-    }
-    
-    // Sort destinations by stop_order
-    usort($route['destinations'], function($a, $b) {
-        return $a['stop_order'] - $b['stop_order'];
-    });
+
+    $route['destinations'] = $destinations;
     
     sendResponse(200, [
         'success' => true,

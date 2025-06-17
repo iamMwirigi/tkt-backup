@@ -25,8 +25,8 @@ try {
             validateRequiredFields([
                 'vehicle_type',
                 'total_seats',
-                'rows',
-                'columns',
+                'row_count',
+                'column_count',
                 'layout'
             ], $data);
             
@@ -43,8 +43,8 @@ try {
                 INSERT INTO vehicle_configurations (
                     vehicle_type,
                     total_seats,
-                    rows,
-                    columns,
+                    row_count,
+                    column_count,
                     layout
                 ) VALUES (?, ?, ?, ?, ?)
             ");
@@ -52,8 +52,8 @@ try {
             $stmt->execute([
                 $data['vehicle_type'],
                 $data['total_seats'],
-                $data['rows'],
-                $data['columns'],
+                $data['row_count'],
+                $data['column_count'],
                 json_encode($data['layout'])
             ]);
             
@@ -96,8 +96,8 @@ try {
             $allowed_fields = [
                 'vehicle_type',
                 'total_seats',
-                'rows',
-                'columns',
+                'row_count',
+                'column_count',
                 'layout'
             ];
             

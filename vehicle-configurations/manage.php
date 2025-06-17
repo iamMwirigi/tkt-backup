@@ -1,209 +1,191 @@
 <?php
-require_once __DIR__ . '/../config/db.php';
-require_once __DIR__ . '/../utils/functions.php';
+require_once '../config/database.php';
+require_once '../utils/response.php';
 
 header('Content-Type: application/json');
 
-try {
-    $db = new Database();
-    $conn = $db->getConnection();
-    
-    // Get request body
-    $data = json_decode(file_get_contents('php://input'), true);
-    
-    // Validate company_id
-    if (!isset($data['company_id'])) {
-        sendResponse(400, [
-            'error' => true,
-            'message' => 'company_id is required'
+// Get request method
+$method = $_SERVER['REQUEST_METHOD'];
+
+// Handle different request methods
+switch ($method) {
+    case 'GET':
+        // Get all configurations
+        $stmt = $conn->query("SELECT * FROM vehicle_configurations");
+        $configurations = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        
+        sendResponse(200, [
+            'error' => false,
+            'data' => $configurations
         ]);
-    }
-    
-    switch ($_SERVER['REQUEST_METHOD']) {
-        case 'POST':
-            // Create new configuration
-            validateRequiredFields([
-                'vehicle_type',
-                'total_seats',
-                'row_count',
-                'column_count',
-                'layout'
-            ], $data);
-            
-            // Validate layout JSON
-            if (!is_array($data['layout'])) {
-                sendResponse(400, [
-                    'error' => true,
-                    'message' => 'layout must be a valid JSON array'
-                ]);
-            }
-            
-            // Check if configuration exists for this vehicle type
-            $stmt = $conn->prepare("SELECT id FROM vehicle_configurations WHERE vehicle_type = ?");
-            $stmt->execute([$data['vehicle_type']]);
-            $existing = $stmt->fetch(PDO::FETCH_ASSOC);
+        break;
+        
+    case 'POST':
+        // Get request body
+        $data = json_decode(file_get_contents('php://input'), true);
+        
+        if (!$data) {
+            sendResponse(400, [
+                'error' => true,
+                'message' => 'Invalid JSON data'
+            ]);
+        }
+        
+        // Create new configuration
+        validateRequiredFields([
+            'company_id',
+            'vehicle_type',
+            'total_seats',
+            'row_count',
+            'column_count',
+            'layout'
+        ], $data);
+        
+        // Validate layout JSON
+        if (!is_array($data['layout'])) {
+            sendResponse(400, [
+                'error' => true,
+                'message' => 'layout must be a valid JSON array'
+            ]);
+        }
+        
+        // Check if configuration exists for this vehicle type and company
+        $stmt = $conn->prepare("SELECT id FROM vehicle_configurations WHERE vehicle_type = ? AND company_id = ?");
+        $stmt->execute([$data['vehicle_type'], $data['company_id']]);
+        $existing = $stmt->fetch(PDO::FETCH_ASSOC);
 
-            if ($existing) {
-                // Update existing configuration
-                $stmt = $conn->prepare("
-                    UPDATE vehicle_configurations 
-                    SET total_seats = ?,
-                        row_count = ?,
-                        column_count = ?,
-                        layout = ?
-                    WHERE vehicle_type = ?
-                ");
-                
-                $stmt->execute([
-                    $data['total_seats'],
-                    $data['row_count'],
-                    $data['column_count'],
-                    json_encode($data['layout']),
-                    $data['vehicle_type']
-                ]);
-
-                sendResponse(200, [
-                    'error' => false,
-                    'message' => 'Vehicle configuration updated successfully',
-                    'id' => $existing['id']
-                ]);
-            } else {
-                // Create new configuration
-                $stmt = $conn->prepare("
-                    INSERT INTO vehicle_configurations (
-                        vehicle_type,
-                        total_seats,
-                        row_count,
-                        column_count,
-                        layout
-                    ) VALUES (?, ?, ?, ?, ?)
-                ");
-                
-                $stmt->execute([
-                    $data['vehicle_type'],
-                    $data['total_seats'],
-                    $data['row_count'],
-                    $data['column_count'],
-                    json_encode($data['layout'])
-                ]);
-
-                sendResponse(201, [
-                    'error' => false,
-                    'message' => 'Vehicle configuration created successfully',
-                    'id' => $conn->lastInsertId()
-                ]);
-            }
-            break;
-            
-        case 'PUT':
-            // Update configuration
-            validateRequiredFields(['id'], $data);
-            
-            // Check if configuration exists
-            $stmt = $conn->prepare("SELECT * FROM vehicle_configurations WHERE id = ?");
-            $stmt->execute([$data['id']]);
-            $config = $stmt->fetch(PDO::FETCH_ASSOC);
-            
-            if (!$config) {
-                sendResponse(404, [
-                    'error' => true,
-                    'message' => 'Vehicle configuration not found'
-                ]);
-            }
-            
-            // Build update query
-            $updates = [];
-            $params = [];
-            
-            $allowed_fields = [
-                'vehicle_type',
-                'total_seats',
-                'row_count',
-                'column_count',
-                'layout'
-            ];
-            
-            foreach ($allowed_fields as $field) {
-                if (isset($data[$field])) {
-                    if ($field === 'layout' && !is_array($data[$field])) {
-                        sendResponse(400, [
-                            'error' => true,
-                            'message' => 'layout must be a valid JSON array'
-                        ]);
-                    }
-                    $updates[] = "$field = ?";
-                    $params[] = $field === 'layout' ? json_encode($data[$field]) : $data[$field];
-                }
-            }
-            
-            if (empty($updates)) {
-                sendResponse(400, [
-                    'error' => true,
-                    'message' => 'No fields to update'
-                ]);
-            }
-            
-            $params[] = $data['id'];
-            
-            // Update configuration
+        if ($existing) {
+            // Update existing configuration
             $stmt = $conn->prepare("
                 UPDATE vehicle_configurations 
-                SET " . implode(', ', $updates) . "
-                WHERE id = ?
+                SET total_seats = ?,
+                    row_count = ?,
+                    column_count = ?,
+                    layout = ?
+                WHERE vehicle_type = ? AND company_id = ?
             ");
             
-            $stmt->execute($params);
-            
-            // Get updated configuration
-            $stmt = $conn->prepare("SELECT * FROM vehicle_configurations WHERE id = ?");
-            $stmt->execute([$data['id']]);
-            $config = $stmt->fetch(PDO::FETCH_ASSOC);
-            
+            $stmt->execute([
+                $data['total_seats'],
+                $data['row_count'],
+                $data['column_count'],
+                json_encode($data['layout']),
+                $data['vehicle_type'],
+                $data['company_id']
+            ]);
+
             sendResponse(200, [
-                'success' => true,
+                'error' => false,
                 'message' => 'Vehicle configuration updated successfully',
-                'data' => [
-                    'configuration' => $config
-                ]
+                'id' => $existing['id']
             ]);
-            break;
+        } else {
+            // Create new configuration
+            $stmt = $conn->prepare("
+                INSERT INTO vehicle_configurations (
+                    company_id,
+                    vehicle_type,
+                    total_seats,
+                    row_count,
+                    column_count,
+                    layout
+                ) VALUES (?, ?, ?, ?, ?, ?)
+            ");
             
-        case 'DELETE':
-            // Delete configuration
-            validateRequiredFields(['id'], $data);
-            
-            // Check if configuration exists
-            $stmt = $conn->prepare("SELECT * FROM vehicle_configurations WHERE id = ?");
-            $stmt->execute([$data['id']]);
-            $config = $stmt->fetch(PDO::FETCH_ASSOC);
-            
-            if (!$config) {
-                sendResponse(404, [
-                    'error' => true,
-                    'message' => 'Vehicle configuration not found'
-                ]);
-            }
-            
-            // Delete configuration
-            $stmt = $conn->prepare("DELETE FROM vehicle_configurations WHERE id = ?");
-            $stmt->execute([$data['id']]);
-            
-            sendResponse(200, [
-                'success' => true,
-                'message' => 'Vehicle configuration deleted successfully'
+            $stmt->execute([
+                $data['company_id'],
+                $data['vehicle_type'],
+                $data['total_seats'],
+                $data['row_count'],
+                $data['column_count'],
+                json_encode($data['layout'])
             ]);
-            break;
-            
-        default:
-            sendResponse(405, [
+
+            sendResponse(201, [
+                'error' => false,
+                'message' => 'Vehicle configuration created successfully',
+                'id' => $conn->lastInsertId()
+            ]);
+        }
+        break;
+        
+    case 'PUT':
+        // Get request body
+        $data = json_decode(file_get_contents('php://input'), true);
+        
+        if (!$data) {
+            sendResponse(400, [
                 'error' => true,
-                'message' => 'Method not allowed'
+                'message' => 'Invalid JSON data'
             ]);
+        }
+        
+        // Update configuration
+        validateRequiredFields(['id', 'company_id'], $data);
+        
+        $stmt = $conn->prepare("
+            UPDATE vehicle_configurations 
+            SET vehicle_type = ?,
+                total_seats = ?,
+                row_count = ?,
+                column_count = ?,
+                layout = ?
+            WHERE id = ? AND company_id = ?
+        ");
+        
+        $stmt->execute([
+            $data['vehicle_type'],
+            $data['total_seats'],
+            $data['row_count'],
+            $data['column_count'],
+            json_encode($data['layout']),
+            $data['id'],
+            $data['company_id']
+        ]);
+        
+        sendResponse(200, [
+            'error' => false,
+            'message' => 'Vehicle configuration updated successfully'
+        ]);
+        break;
+        
+    case 'DELETE':
+        // Get configuration ID from query string
+        $id = $_GET['id'] ?? null;
+        $company_id = $_GET['company_id'] ?? null;
+        
+        if (!$id || !$company_id) {
+            sendResponse(400, [
+                'error' => true,
+                'message' => 'Configuration ID and company_id are required'
+            ]);
+        }
+        
+        // Delete configuration
+        $stmt = $conn->prepare("DELETE FROM vehicle_configurations WHERE id = ? AND company_id = ?");
+        $stmt->execute([$id, $company_id]);
+        
+        sendResponse(200, [
+            'error' => false,
+            'message' => 'Vehicle configuration deleted successfully'
+        ]);
+        break;
+        
+    default:
+        sendResponse(405, [
+            'error' => true,
+            'message' => 'Method not allowed'
+        ]);
+        break;
+}
+
+function validateRequiredFields($requiredFields, $data) {
+    foreach ($requiredFields as $field) {
+        if (!isset($data[$field]) || empty($data[$field])) {
+            sendResponse(400, [
+                'error' => true,
+                'message' => "Missing or empty required field: $field"
+            ]);
+        }
     }
-    
-} catch (Exception $e) {
-    sendResponse(400, [
-        'error' => true,
-        'message' => $e->getMessage()
-    ]);
 } 

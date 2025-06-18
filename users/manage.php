@@ -100,9 +100,11 @@ try {
             }
             
             // Check if user exists and belongs to company
-            $stmt = $conn->prepare("SELECT id FROM users WHERE id = ? AND company_id = ?");
+            $stmt = $conn->prepare("SELECT id, email FROM users WHERE id = ? AND company_id = ?");
             $stmt->execute([$data['user_id'], $data['company_id']]);
-            if (!$stmt->fetch()) {
+            $existing_user = $stmt->fetch(PDO::FETCH_ASSOC);
+            
+            if (!$existing_user) {
                 sendResponse(404, [
                     'error' => true,
                     'message' => 'User not found'
@@ -118,13 +120,13 @@ try {
             }
             
             if (isset($data['email'])) {
-                // Check if new email already exists
-                $stmt = $conn->prepare("SELECT id FROM users WHERE email = ? AND id != ?");
-                $stmt->execute([$data['email'], $data['user_id']]);
+                // Check if new email already exists (excluding current user)
+                $stmt = $conn->prepare("SELECT id FROM users WHERE email = ? AND id != ? AND company_id = ?");
+                $stmt->execute([$data['email'], $data['user_id'], $data['company_id']]);
                 if ($stmt->fetch()) {
                     sendResponse(400, [
                         'error' => true,
-                        'message' => 'Email already exists'
+                        'message' => 'Email already exists for another user in this company'
                     ]);
                 }
                 $updates[] = 'email = ?';
@@ -163,9 +165,31 @@ try {
             ");
             $stmt->execute($params);
             
+            // Get updated user data
+            $stmt = $conn->prepare("
+                SELECT u.*, c.name as company_name, o.name as office_name 
+                FROM users u 
+                LEFT JOIN companies c ON u.company_id = c.id 
+                LEFT JOIN offices o ON u.office_id = o.id 
+                WHERE u.id = ? AND u.company_id = ?
+            ");
+            $stmt->execute([$data['user_id'], $data['company_id']]);
+            $updated_user = $stmt->fetch(PDO::FETCH_ASSOC);
+            
             sendResponse(200, [
                 'success' => true,
-                'message' => 'User updated successfully'
+                'message' => 'User updated successfully',
+                'user' => [
+                    'user_id' => $updated_user['id'],
+                    'name' => $updated_user['name'],
+                    'email' => $updated_user['email'],
+                    'role' => $updated_user['role'],
+                    'company_id' => $updated_user['company_id'],
+                    'office_id' => $updated_user['office_id'],
+                    'company_name' => $updated_user['company_name'],
+                    'office_name' => $updated_user['office_name'],
+                    'created_at' => $updated_user['created_at']
+                ]
             ]);
             break;
             

@@ -48,6 +48,8 @@ try {
             v.*,
             vo.name as owner_name,
             vo.phone as owner_phone,
+            vt.name as vehicle_type_name,
+            vt.seats as vehicle_type_seats,
             (
                 SELECT COUNT(*) 
                 FROM trips t 
@@ -56,6 +58,7 @@ try {
             ) as active_trips
         FROM vehicles v
         LEFT JOIN vehicle_owners vo ON v.owner_id = vo.id
+        LEFT JOIN vehicle_types vt ON v.vehicle_type = vt.name AND v.company_id = vt.company_id
         WHERE v.company_id = ?
         ORDER BY v.plate_number ASC
     ");

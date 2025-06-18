@@ -188,25 +188,51 @@ try {
                 ]);
             }
             
-            // Check if user has any bookings
-            $stmt = $conn->prepare("SELECT COUNT(*) as booking_count FROM bookings WHERE user_id = ?");
-            $stmt->execute([$data['user_id']]);
-            $result = $stmt->fetch(PDO::FETCH_ASSOC);
-            
-            if ($result['booking_count'] > 0) {
-                sendResponse(400, [
-                    'error' => true,
-                    'message' => 'Cannot delete user because they have existing bookings. Please reassign or delete the bookings first.'
+            try {
+                // Attempt to delete the user
+                $stmt = $conn->prepare("DELETE FROM users WHERE id = ? AND company_id = ?");
+                $stmt->execute([$data['user_id'], $data['company_id']]);
+                
+                sendResponse(200, [
+                    'success' => true,
+                    'message' => 'User deleted successfully'
                 ]);
+            } catch (PDOException $e) {
+                // If deletion fails due to foreign key constraint
+                if ($e->getCode() == '23000') {
+                    // Check which tables have references
+                    $tables = ['bookings', 'tickets', 'payments', 'offenses'];
+                    $references = [];
+                    
+                    foreach ($tables as $table) {
+                        $stmt = $conn->prepare("SELECT COUNT(*) as count FROM $table WHERE user_id = ?");
+                        $stmt->execute([$data['user_id']]);
+                        $result = $stmt->fetch(PDO::FETCH_ASSOC);
+                        if ($result['count'] > 0) {
+                            $references[] = $table;
+                        }
+                    }
+                    
+                    if (!empty($references)) {
+                        sendResponse(400, [
+                            'error' => true,
+                            'message' => 'Cannot delete user because they have existing records in: ' . implode(', ', $references) . '. Please delete or reassign these records first.'
+                        ]);
+                    } else {
+                        // If no references found but still getting constraint error
+                        sendResponse(400, [
+                            'error' => true,
+                            'message' => 'Cannot delete user due to existing references. Please contact support.'
+                        ]);
+                    }
+                } else {
+                    // For other database errors
+                    sendResponse(400, [
+                        'error' => true,
+                        'message' => 'Database error: ' . $e->getMessage()
+                    ]);
+                }
             }
-            
-            $stmt = $conn->prepare("DELETE FROM users WHERE id = ? AND company_id = ?");
-            $stmt->execute([$data['user_id'], $data['company_id']]);
-            
-            sendResponse(200, [
-                'success' => true,
-                'message' => 'User deleted successfully'
-            ]);
             break;
             
         default:

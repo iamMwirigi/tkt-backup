@@ -56,14 +56,15 @@ try {
             
             // Check if stop_order already exists for this route
             $stmt = $conn->prepare("
-                SELECT id FROM destinations 
+                SELECT id, name FROM destinations 
                 WHERE route_id = ? AND stop_order = ?
             ");
             $stmt->execute([$data['route_id'], $data['stop_order']]);
-            if ($stmt->fetch()) {
+            $existing = $stmt->fetch(PDO::FETCH_ASSOC);
+            if ($existing) {
                 sendResponse(400, [
                     'error' => true,
-                    'message' => 'Stop order ' . $data['stop_order'] . ' already exists for this route'
+                    'message' => "Stop order {$data['stop_order']} is already taken by destination '{$existing['name']}' in this route"
                 ]);
             }
             
@@ -151,7 +152,7 @@ try {
             
             // Verify destination exists and belongs to company
             $stmt = $conn->prepare("
-                SELECT d.id, d.route_id 
+                SELECT d.id, d.route_id, d.name 
                 FROM destinations d
                 JOIN routes r ON d.route_id = r.id
                 WHERE d.id = ? AND r.company_id = ?
@@ -167,14 +168,15 @@ try {
             
             // Check if new stop_order already exists for this route (excluding current destination)
             $stmt = $conn->prepare("
-                SELECT id FROM destinations 
+                SELECT id, name FROM destinations 
                 WHERE route_id = ? AND stop_order = ? AND id != ?
             ");
             $stmt->execute([$existing['route_id'], $data['stop_order'], $data['id']]);
-            if ($stmt->fetch()) {
+            $conflicting = $stmt->fetch(PDO::FETCH_ASSOC);
+            if ($conflicting) {
                 sendResponse(400, [
                     'error' => true,
-                    'message' => 'Stop order ' . $data['stop_order'] . ' already exists for this route'
+                    'message' => "Stop order {$data['stop_order']} is already taken by destination '{$conflicting['name']}' in this route"
                 ]);
             }
             

@@ -104,9 +104,24 @@ try {
         $stmt->execute($params);
         $users = $stmt->fetchAll(PDO::FETCH_ASSOC);
         
+        // Format the response to use user_id consistently
+        $formatted_users = array_map(function($user) {
+            return [
+                'user_id' => $user['id'],
+                'name' => $user['name'],
+                'email' => $user['email'],
+                'role' => $user['role'],
+                'company_id' => $user['company_id'],
+                'office_id' => $user['office_id'],
+                'company_name' => $user['company_name'],
+                'office_name' => $user['office_name'],
+                'created_at' => $user['created_at']
+            ];
+        }, $users);
+        
         sendResponse(200, [
             'success' => true,
-            'users' => $users
+            'users' => $formatted_users
         ]);
     }
 } catch (Exception $e) {

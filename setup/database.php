@@ -19,7 +19,7 @@ try {
         name VARCHAR(100) NOT NULL,
         email VARCHAR(100) UNIQUE NOT NULL,
         password VARCHAR(255) NOT NULL,
-        role ENUM('admin', 'user') DEFAULT 'user',
+        role ENUM('admin', 'manager', 'attendant', 'guest') DEFAULT 'guest',
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (company_id) REFERENCES companies(id)
     )");

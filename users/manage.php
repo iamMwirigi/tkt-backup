@@ -201,11 +201,16 @@ try {
                 // If deletion fails due to foreign key constraint
                 if ($e->getCode() == '23000') {
                     // Check which tables have references
-                    $tables = ['bookings', 'tickets', 'payments', 'offenses'];
+                    $tables = [
+                        'bookings' => 'user_id',
+                        'tickets' => 'created_by',
+                        'payments' => 'created_by',
+                        'offenses' => 'created_by'
+                    ];
                     $references = [];
                     
-                    foreach ($tables as $table) {
-                        $stmt = $conn->prepare("SELECT COUNT(*) as count FROM $table WHERE user_id = ?");
+                    foreach ($tables as $table => $column) {
+                        $stmt = $conn->prepare("SELECT COUNT(*) as count FROM $table WHERE $column = ?");
                         $stmt->execute([$data['user_id']]);
                         $result = $stmt->fetch(PDO::FETCH_ASSOC);
                         if ($result['count'] > 0) {

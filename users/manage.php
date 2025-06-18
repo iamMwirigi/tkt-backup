@@ -188,6 +188,18 @@ try {
                 ]);
             }
             
+            // Check if user has any bookings
+            $stmt = $conn->prepare("SELECT COUNT(*) as booking_count FROM bookings WHERE user_id = ?");
+            $stmt->execute([$data['user_id']]);
+            $result = $stmt->fetch(PDO::FETCH_ASSOC);
+            
+            if ($result['booking_count'] > 0) {
+                sendResponse(400, [
+                    'error' => true,
+                    'message' => 'Cannot delete user because they have existing bookings. Please reassign or delete the bookings first.'
+                ]);
+            }
+            
             $stmt = $conn->prepare("DELETE FROM users WHERE id = ? AND company_id = ?");
             $stmt->execute([$data['user_id'], $data['company_id']]);
             

@@ -47,8 +47,11 @@ try {
     if (isset($data['vehicle_id'])) {
         $stmt = $conn->prepare("
             SELECT v.*,
+                   vt.name as vehicle_type_name,
+                   vt.seats as vehicle_type_seats,
                    COUNT(DISTINCT t.id) as active_trips
             FROM vehicles v
+            LEFT JOIN vehicle_types vt ON v.vehicle_type = vt.name AND v.company_id = vt.company_id
             LEFT JOIN trips t ON v.id = t.vehicle_id AND t.status = 'in_progress'
             WHERE v.id = ? AND v.company_id = ?
             GROUP BY v.id
@@ -74,8 +77,11 @@ try {
         // Get all vehicles for the company
         $stmt = $conn->prepare("
             SELECT v.*,
+                   vt.name as vehicle_type_name,
+                   vt.seats as vehicle_type_seats,
                    COUNT(DISTINCT t.id) as active_trips
             FROM vehicles v
+            LEFT JOIN vehicle_types vt ON v.vehicle_type = vt.name AND v.company_id = vt.company_id
             LEFT JOIN trips t ON v.id = t.vehicle_id AND t.status = 'in_progress'
             WHERE v.company_id = ?
             GROUP BY v.id

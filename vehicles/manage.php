@@ -52,10 +52,12 @@ try {
                         v.*,
                         vo.name as owner_name,
                         vo.phone as owner_phone,
-                        c.name as company_name
+                        c.name as company_name,
+                        vt.seats as vehicle_type_seats
                     FROM vehicles v
                     LEFT JOIN vehicle_owners vo ON v.owner_id = vo.id
                     LEFT JOIN companies c ON v.company_id = c.id
+                    LEFT JOIN vehicle_types vt ON v.vehicle_type = vt.name AND v.company_id = vt.company_id
                     WHERE v.id = ? AND v.company_id = ?
                 ");
                 $stmt->execute([$_GET['id'], $data['company_id']]);
@@ -99,10 +101,12 @@ try {
                         v.*,
                         vo.name as owner_name,
                         vo.phone as owner_phone,
-                        c.name as company_name
+                        c.name as company_name,
+                        vt.seats as vehicle_type_seats
                     FROM vehicles v
                     LEFT JOIN vehicle_owners vo ON v.owner_id = vo.id
                     LEFT JOIN companies c ON v.company_id = c.id
+                    LEFT JOIN vehicle_types vt ON v.vehicle_type = vt.name AND v.company_id = vt.company_id
                     WHERE $where_clause
                     ORDER BY v.plate_number ASC
                 ");
@@ -139,11 +143,12 @@ try {
             }
             
             // Validate vehicle type
-            $allowed_types = ['Bus', 'Van', 'Car', 'Truck'];
-            if (!in_array($data['vehicle_type'], $allowed_types)) {
+            $stmt = $conn->prepare("SELECT id FROM vehicle_types WHERE name = ? AND company_id = ?");
+            $stmt->execute([$data['vehicle_type'], $data['company_id']]);
+            if (!$stmt->fetch()) {
                 sendResponse(400, [
                     'error' => true,
-                    'message' => 'Invalid vehicle type. Allowed types: ' . implode(', ', $allowed_types)
+                    'message' => 'Invalid vehicle type. Please select a valid vehicle type from your company\'s vehicle types.'
                 ]);
             }
             
@@ -192,9 +197,11 @@ try {
                     SELECT 
                         v.*,
                         vo.name as owner_name,
-                        vo.phone as owner_phone
+                        vo.phone as owner_phone,
+                        vt.seats as vehicle_type_seats
                     FROM vehicles v
                     LEFT JOIN vehicle_owners vo ON v.owner_id = vo.id
+                    LEFT JOIN vehicle_types vt ON v.vehicle_type = vt.name AND v.company_id = vt.company_id
                     WHERE v.id = ?
                 ");
                 $stmt->execute([$vehicle_id]);
@@ -264,9 +271,10 @@ try {
                         
                         // Validate vehicle type if being updated
                         if ($field === 'vehicle_type') {
-                            $allowed_types = ['Bus', 'Van', 'Car', 'Truck'];
-                            if (!in_array($data['vehicle_type'], $allowed_types)) {
-                                throw new Exception('Invalid vehicle type. Allowed types: ' . implode(', ', $allowed_types));
+                            $stmt = $conn->prepare("SELECT id FROM vehicle_types WHERE name = ? AND company_id = ?");
+                            $stmt->execute([$data['vehicle_type'], $data['company_id']]);
+                            if (!$stmt->fetch()) {
+                                throw new Exception('Invalid vehicle type. Please select a valid vehicle type from your company\'s vehicle types.');
                             }
                         }
                         
@@ -323,9 +331,11 @@ try {
                     SELECT 
                         v.*,
                         vo.name as owner_name,
-                        vo.phone as owner_phone
+                        vo.phone as owner_phone,
+                        vt.seats as vehicle_type_seats
                     FROM vehicles v
                     LEFT JOIN vehicle_owners vo ON v.owner_id = vo.id
+                    LEFT JOIN vehicle_types vt ON v.vehicle_type = vt.name AND v.company_id = vt.company_id
                     WHERE v.id = ?
                 ");
                 $stmt->execute([$data['id']]);

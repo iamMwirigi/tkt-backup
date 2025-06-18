@@ -120,17 +120,6 @@ try {
             }
             
             if (isset($data['email'])) {
-                // Only check for email uniqueness if the email is actually changing
-                if ($data['email'] !== $existing_user['email']) {
-                    $stmt = $conn->prepare("SELECT id FROM users WHERE email = ? AND id != ? AND company_id = ?");
-                    $stmt->execute([$data['email'], $data['user_id'], $data['company_id']]);
-                    if ($stmt->fetch()) {
-                        sendResponse(400, [
-                            'error' => true,
-                            'message' => 'Email already exists for another user in this company'
-                        ]);
-                    }
-                }
                 $updates[] = 'email = ?';
                 $params[] = $data['email'];
             }

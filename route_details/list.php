@@ -70,21 +70,7 @@ try {
                                    'stop_order', d.stop_order,
                                    'min_fare', d.min_fare,
                                    'max_fare', d.max_fare,
-                                   'current_fare', d.current_fare,
-                                   'fares', (
-                                       SELECT COALESCE(
-                                           JSON_ARRAYAGG(
-                                               JSON_OBJECT(
-                                                   'id', f.id,
-                                                   'label', f.label,
-                                                   'amount', f.amount
-                                               )
-                                           ),
-                                           '[]'
-                                       )
-                                       FROM fares f
-                                       WHERE f.destination_id = d.id
-                                   )
+                                   'current_fare', d.current_fare
                                )
                            ELSE NULL
                        END

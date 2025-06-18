@@ -195,7 +195,9 @@ try {
                     fare_amount,
                     status,
                     company_id
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, 'booked', ?)
+                ) SELECT ?, ?, ?, ?, ?, ?, d.current_fare, 'booked', ?
+                FROM destinations d
+                WHERE d.id = ?
             ");
             $stmt->execute([
                 $data['trip_id'],
@@ -204,8 +206,8 @@ try {
                 $data['customer_phone'],
                 $data['destination_id'],
                 $data['seat_number'],
-                $data['fare_amount'],
-                $data['company_id']
+                $data['company_id'],
+                $data['destination_id']
             ]);
             
             $booking_id = $conn->lastInsertId();

@@ -25,6 +25,7 @@ if (file_exists(__DIR__ . '/../vendor/autoload.php')) {
 require_once __DIR__ . '/../config/db.php';
 require_once __DIR__ . '/../utils/functions.php';
 
+// Set JSON content type
 header('Content-Type: application/json');
 
 // Use dummy values for testing
@@ -42,7 +43,7 @@ try {
     switch ($_SERVER['REQUEST_METHOD']) {
         case 'POST':
             // Create new destination
-            validateRequiredFields(['route_id', 'name', 'stop_order', 'fares'], $data);
+            validateRequiredFields(['route_id', 'name', 'stop_order'], $data);
             
             // Verify route exists and belongs to company
             $stmt = $conn->prepare("SELECT id FROM routes WHERE id = ? AND company_id = ?");
@@ -68,82 +69,43 @@ try {
                 ]);
             }
             
-            // Start transaction
-            $conn->beginTransaction();
+            // Create destination
+            $stmt = $conn->prepare("
+                INSERT INTO destinations (
+                    route_id, 
+                    name, 
+                    stop_order, 
+                    min_fare, 
+                    max_fare, 
+                    current_fare
+                ) VALUES (?, ?, ?, ?, ?, ?)
+            ");
+            $stmt->execute([
+                $data['route_id'],
+                $data['name'],
+                $data['stop_order'],
+                $data['min_fare'] ?? 0,
+                $data['max_fare'] ?? 0,
+                $data['current_fare'] ?? 0
+            ]);
             
-            try {
-                // Create destination
-                $stmt = $conn->prepare("
-                    INSERT INTO destinations (route_id, name, stop_order, min_fare, max_fare, current_fare) 
-                    VALUES (?, ?, ?, ?, ?, ?)
-                ");
-                $stmt->execute([
-                    $data['route_id'],
-                    $data['name'],
-                    $data['stop_order'],
-                    $data['min_fare'] ?? 0,
-                    $data['max_fare'] ?? 0,
-                    $data['current_fare'] ?? 0
-                ]);
-                
-                $destination_id = $conn->lastInsertId();
-                
-                // Create fares
-                if (!isset($data['fares']) || !is_array($data['fares']) || empty($data['fares'])) {
-                    throw new Exception('At least one fare is required for the destination');
-                }
-                
-                foreach ($data['fares'] as $fare) {
-                    if (!isset($fare['label']) || !isset($fare['amount'])) {
-                        throw new Exception('Each fare must have a label and amount');
-                    }
-                    
-                    $stmt = $conn->prepare("
-                        INSERT INTO fares (destination_id, label, amount) 
-                        VALUES (?, ?, ?)
-                    ");
-                    $stmt->execute([
-                        $destination_id,
-                        $fare['label'],
-                        $fare['amount']
-                    ]);
-                }
-                
-                // Commit transaction
-                $conn->commit();
-                
-                // Get created destination with fares
-                $stmt = $conn->prepare("
-                    SELECT d.*, 
-                           JSON_ARRAYAGG(
-                               JSON_OBJECT(
-                                   'id', f.id,
-                                   'label', f.label,
-                                   'amount', f.amount
-                               )
-                           ) as fares
-                    FROM destinations d
-                    LEFT JOIN fares f ON d.id = f.destination_id
-                    WHERE d.id = ?
-                    GROUP BY d.id
-                ");
-                $stmt->execute([$destination_id]);
-                $destination = $stmt->fetch(PDO::FETCH_ASSOC);
-                
-                // Parse fares JSON
-                $destination['fares'] = json_decode($destination['fares'], true);
-                
-                sendResponse(201, [
-                    'success' => true,
-                    'message' => 'Destination created successfully',
-                    'destination' => $destination
-                ]);
-                
-            } catch (Exception $e) {
-                // Rollback transaction on error
-                $conn->rollBack();
-                throw $e;
-            }
+            $destination_id = $conn->lastInsertId();
+            
+            // Get created destination
+            $stmt = $conn->prepare("
+                SELECT d.*, r.name as route_name
+                FROM destinations d
+                JOIN routes r ON d.route_id = r.id
+                WHERE d.id = ?
+            ");
+            $stmt->execute([$destination_id]);
+            $destination = $stmt->fetch(PDO::FETCH_ASSOC);
+            
+            sendResponse(201, [
+                'success' => true,
+                'message' => 'Destination created successfully',
+                'destination' => $destination
+            ]);
             break;
             
         case 'PUT':
@@ -158,84 +120,52 @@ try {
                 WHERE d.id = ? AND r.company_id = ?
             ");
             $stmt->execute([$data['id'], $company_id]);
-            $existing = $stmt->fetch(PDO::FETCH_ASSOC);
-            if (!$existing) {
+            if (!$stmt->fetch()) {
                 sendResponse(404, [
                     'error' => true,
                     'message' => 'Destination not found or does not belong to your company'
                 ]);
             }
             
-            // Check if new stop_order already exists for this route (excluding current destination)
+            // Check if new stop_order conflicts with another destination
             $stmt = $conn->prepare("
                 SELECT id, name FROM destinations 
-                WHERE route_id = ? AND stop_order = ? AND id != ?
+                WHERE route_id = (SELECT route_id FROM destinations WHERE id = ?)
+                AND stop_order = ? 
+                AND id != ?
             ");
-            $stmt->execute([$existing['route_id'], $data['stop_order'], $data['id']]);
-            $conflicting = $stmt->fetch(PDO::FETCH_ASSOC);
-            if ($conflicting) {
+            $stmt->execute([$data['id'], $data['stop_order'], $data['id']]);
+            $existing = $stmt->fetch(PDO::FETCH_ASSOC);
+            if ($existing) {
                 sendResponse(400, [
                     'error' => true,
-                    'message' => "Stop order {$data['stop_order']} is already taken by destination '{$conflicting['name']}' in this route"
+                    'message' => "Stop order {$data['stop_order']} is already taken by destination '{$existing['name']}' in this route"
                 ]);
             }
             
-            // Start transaction
-            $conn->beginTransaction();
+            // Update destination
+            $stmt = $conn->prepare("
+                UPDATE destinations 
+                SET name = ?, 
+                    stop_order = ?, 
+                    min_fare = ?, 
+                    max_fare = ?, 
+                    current_fare = ? 
+                WHERE id = ?
+            ");
+            $stmt->execute([
+                $data['name'],
+                $data['stop_order'],
+                $data['min_fare'] ?? 0,
+                $data['max_fare'] ?? 0,
+                $data['current_fare'] ?? 0,
+                $data['id']
+            ]);
             
-            try {
-                // Update destination
-                $stmt = $conn->prepare("
-                    UPDATE destinations 
-                    SET name = ?, stop_order = ?, min_fare = ?, max_fare = ?, current_fare = ? 
-                    WHERE id = ?
-                ");
-                $stmt->execute([
-                    $data['name'],
-                    $data['stop_order'],
-                    $data['min_fare'] ?? 0,
-                    $data['max_fare'] ?? 0,
-                    $data['current_fare'] ?? 0,
-                    $data['id']
-                ]);
-                
-                // Update fares if provided
-                if (isset($data['fares']) && is_array($data['fares'])) {
-                    // Delete existing fares
-                    $stmt = $conn->prepare("DELETE FROM fares WHERE destination_id = ?");
-                    $stmt->execute([$data['id']]);
-                    
-                    // Create new fares
-                    foreach ($data['fares'] as $fare) {
-                        if (!isset($fare['label']) || !isset($fare['amount'])) {
-                            throw new Exception('Each fare must have a label and amount');
-                        }
-                        
-                        $stmt = $conn->prepare("
-                            INSERT INTO fares (destination_id, label, amount) 
-                            VALUES (?, ?, ?)
-                        ");
-                        $stmt->execute([
-                            $data['id'],
-                            $fare['label'],
-                            $fare['amount']
-                        ]);
-                    }
-                }
-                
-                // Commit transaction
-                $conn->commit();
-                
-                sendResponse(200, [
-                    'success' => true,
-                    'message' => 'Destination updated successfully'
-                ]);
-                
-            } catch (Exception $e) {
-                // Rollback transaction on error
-                $conn->rollBack();
-                throw $e;
-            }
+            sendResponse(200, [
+                'success' => true,
+                'message' => 'Destination updated successfully'
+            ]);
             break;
             
         case 'DELETE':
@@ -273,7 +203,7 @@ try {
                 ]);
             }
             
-            // Delete destination (cascade will handle fares)
+            // Delete destination
             $stmt = $conn->prepare("DELETE FROM destinations WHERE id = ?");
             $stmt->execute([$data['id']]);
             

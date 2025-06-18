@@ -54,6 +54,19 @@ try {
                 ]);
             }
             
+            // Check if stop_order already exists for this route
+            $stmt = $conn->prepare("
+                SELECT id FROM destinations 
+                WHERE route_id = ? AND stop_order = ?
+            ");
+            $stmt->execute([$data['route_id'], $data['stop_order']]);
+            if ($stmt->fetch()) {
+                sendResponse(400, [
+                    'error' => true,
+                    'message' => 'Stop order ' . $data['stop_order'] . ' already exists for this route'
+                ]);
+            }
+            
             // Start transaction
             $conn->beginTransaction();
             
@@ -138,16 +151,30 @@ try {
             
             // Verify destination exists and belongs to company
             $stmt = $conn->prepare("
-                SELECT d.id 
+                SELECT d.id, d.route_id 
                 FROM destinations d
                 JOIN routes r ON d.route_id = r.id
                 WHERE d.id = ? AND r.company_id = ?
             ");
             $stmt->execute([$data['id'], $company_id]);
-            if (!$stmt->fetch()) {
+            $existing = $stmt->fetch(PDO::FETCH_ASSOC);
+            if (!$existing) {
                 sendResponse(404, [
                     'error' => true,
                     'message' => 'Destination not found or does not belong to your company'
+                ]);
+            }
+            
+            // Check if new stop_order already exists for this route (excluding current destination)
+            $stmt = $conn->prepare("
+                SELECT id FROM destinations 
+                WHERE route_id = ? AND stop_order = ? AND id != ?
+            ");
+            $stmt->execute([$existing['route_id'], $data['stop_order'], $data['id']]);
+            if ($stmt->fetch()) {
+                sendResponse(400, [
+                    'error' => true,
+                    'message' => 'Stop order ' . $data['stop_order'] . ' already exists for this route'
                 ]);
             }
             

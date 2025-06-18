@@ -42,37 +42,75 @@ try {
         ]);
     }
 
-    // Get all destinations for the specified company with their fares
-    $stmt = $conn->prepare("
+    // If route_id is provided, validate it belongs to the company
+    if (isset($data['route_id'])) {
+        $stmt = $conn->prepare("
+            SELECT id FROM routes 
+            WHERE id = ? AND company_id = ?
+        ");
+        $stmt->execute([$data['route_id'], $data['company_id']]);
+        if (!$stmt->fetch()) {
+            sendResponse(404, [
+                'error' => true,
+                'message' => 'Route not found or does not belong to your company'
+            ]);
+        }
+    }
+
+    // Build the base query
+    $sql = "
         SELECT d.*,
                r.name as route_name,
                r.description as route_description,
                d.min_fare,
                d.max_fare,
-               JSON_ARRAYAGG(
-                   JSON_OBJECT(
-                       'id', f.id,
-                       'label', f.label,
-                       'amount', f.amount
-                   )
+               COALESCE(
+                   JSON_ARRAYAGG(
+                       CASE 
+                           WHEN f.id IS NOT NULL THEN
+                               JSON_OBJECT(
+                                   'id', f.id,
+                                   'label', f.label,
+                                   'amount', f.amount
+                               )
+                           ELSE NULL
+                       END
+                   ),
+                   '[]'
                ) as fares
         FROM destinations d
         JOIN routes r ON d.route_id = r.id
         LEFT JOIN fares f ON d.id = f.destination_id
         WHERE r.company_id = ?
+    ";
+
+    $params = [$data['company_id']];
+
+    // Add route_id filter if provided
+    if (isset($data['route_id'])) {
+        $sql .= " AND d.route_id = ?";
+        $params[] = $data['route_id'];
+    }
+
+    // Complete the query with grouping and ordering
+    $sql .= "
         GROUP BY d.id
         ORDER BY r.name ASC, d.stop_order ASC
-    ");
-    $stmt->execute([$data['company_id']]);
+    ";
+
+    $stmt = $conn->prepare($sql);
+    $stmt->execute($params);
     $destinations = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
     // Parse fares JSON for each destination
     foreach ($destinations as &$destination) {
-        $destination['fares'] = json_decode($destination['fares'], true);
-        // Remove null fares (if a destination has no fares)
-        if ($destination['fares'][0] === null) {
-            $destination['fares'] = [];
-        }
+        $fares = json_decode($destination['fares'], true);
+        // Filter out null values from fares array
+        $destination['fares'] = array_filter($fares, function($fare) {
+            return $fare !== null;
+        });
+        // Reindex array after filtering
+        $destination['fares'] = array_values($destination['fares']);
     }
 
     sendResponse(200, [

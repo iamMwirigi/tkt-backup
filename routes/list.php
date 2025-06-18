@@ -70,10 +70,26 @@ try {
         sendResponse(400, ['error' => true, 'message' => 'Invalid device']);
     }
 
-    // Get all routes for the specified company
+    // Get all routes for the specified company with their destinations and fares
     $stmt = $conn->prepare("
-        SELECT r.*, 
-               COUNT(DISTINCT d.id) as destination_count
+        SELECT r.*,
+               COALESCE(
+                   JSON_ARRAYAGG(
+                       CASE 
+                           WHEN d.id IS NOT NULL THEN
+                               JSON_OBJECT(
+                                   'id', d.id,
+                                   'name', d.name,
+                                   'stop_order', d.stop_order,
+                                   'min_fare', d.min_fare,
+                                   'max_fare', d.max_fare,
+                                   'current_fare', d.current_fare
+                               )
+                           ELSE NULL
+                       END
+                   ),
+                   '[]'
+               ) as destinations
         FROM routes r
         LEFT JOIN destinations d ON r.id = d.route_id
         WHERE r.company_id = ?
@@ -82,6 +98,19 @@ try {
     ");
     $stmt->execute([$data['company_id']]);
     $routes = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+    // Process each route's destinations
+    foreach ($routes as &$route) {
+        $destinations = json_decode($route['destinations'], true);
+        // Filter out null values and sort by stop_order
+        $destinations = array_filter($destinations, function($dest) {
+            return $dest !== null;
+        });
+        usort($destinations, function($a, $b) {
+            return $a['stop_order'] - $b['stop_order'];
+        });
+        $route['destinations'] = array_values($destinations);
+    }
 
     sendResponse(200, [
         'success' => true,

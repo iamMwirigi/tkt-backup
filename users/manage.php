@@ -43,13 +43,60 @@ try {
     }
     
     switch ($_SERVER['REQUEST_METHOD']) {
+        case 'GET':
+            // Get user details
+            if (!isset($data['user_id'])) {
+                sendResponse(400, [
+                    'error' => true,
+                    'message' => 'User ID is required'
+                ]);
+            }
+            
+            $stmt = $conn->prepare("
+                SELECT u.*, c.name as company_name, o.name as office_name 
+                FROM users u 
+                LEFT JOIN companies c ON u.company_id = c.id 
+                LEFT JOIN offices o ON u.office_id = o.id 
+                WHERE u.id = ? AND u.company_id = ?
+            ");
+            $stmt->execute([$data['user_id'], $data['company_id']]);
+            $user = $stmt->fetch(PDO::FETCH_ASSOC);
+            
+            if (!$user) {
+                sendResponse(404, [
+                    'error' => true,
+                    'message' => 'User not found'
+                ]);
+            }
+            
+            sendResponse(200, [
+                'success' => true,
+                'user' => [
+                    'user_id' => $user['id'],
+                    'name' => $user['name'],
+                    'email' => $user['email'],
+                    'role' => $user['role'],
+                    'company_id' => $user['company_id'],
+                    'office_id' => $user['office_id'],
+                    'company_name' => $user['company_name'],
+                    'office_name' => $user['office_name'],
+                    'created_at' => $user['created_at']
+                ]
+            ]);
+            break;
+            
         case 'POST':
             // Create new user
-            validateRequiredFields(['name', 'email', 'password', 'role'], $data);
+            if (!isset($data['name']) || !isset($data['email']) || !isset($data['password']) || !isset($data['role'])) {
+                sendResponse(400, [
+                    'error' => true,
+                    'message' => 'Name, email, password, and role are required'
+                ]);
+            }
             
-            // Check if email already exists
-            $stmt = $conn->prepare("SELECT id FROM users WHERE email = ?");
-            $stmt->execute([$data['email']]);
+            // Check if email already exists in the company
+            $stmt = $conn->prepare("SELECT id FROM users WHERE email = ? AND company_id = ?");
+            $stmt->execute([$data['email'], $data['company_id']]);
             if ($stmt->fetch()) {
                 sendResponse(400, [
                     'error' => true,
@@ -57,23 +104,31 @@ try {
                 ]);
             }
             
-            // Hash password
-            $hashed_password = password_hash($data['password'], PASSWORD_DEFAULT);
-            
             $stmt = $conn->prepare("
-                INSERT INTO users (company_id, office_id, name, email, password, role) 
+                INSERT INTO users (name, email, password, role, company_id, office_id) 
                 VALUES (?, ?, ?, ?, ?, ?)
             ");
             $stmt->execute([
-                $data['company_id'],
-                $data['office_id'] ?? null,
                 $data['name'],
                 $data['email'],
-                $hashed_password,
-                $data['role']
+                password_hash($data['password'], PASSWORD_DEFAULT),
+                $data['role'],
+                $data['company_id'],
+                $data['office_id'] ?? null
             ]);
             
             $user_id = $conn->lastInsertId();
+            
+            // Get the created user with company and office names
+            $stmt = $conn->prepare("
+                SELECT u.*, c.name as company_name, o.name as office_name 
+                FROM users u 
+                LEFT JOIN companies c ON u.company_id = c.id 
+                LEFT JOIN offices o ON u.office_id = o.id 
+                WHERE u.id = ?
+            ");
+            $stmt->execute([$user_id]);
+            $user = $stmt->fetch(PDO::FETCH_ASSOC);
             
             sendResponse(201, [
                 'success' => true,

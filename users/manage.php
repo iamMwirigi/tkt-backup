@@ -79,7 +79,7 @@ try {
                 'success' => true,
                 'message' => 'User created successfully',
                 'user' => [
-                    'id' => $user_id,
+                    'user_id' => $user_id,
                     'name' => $data['name'],
                     'email' => $data['email'],
                     'role' => $data['role'],
@@ -92,7 +92,7 @@ try {
             
         case 'PUT':
             // Update user
-            if (!isset($_GET['id'])) {
+            if (!isset($data['user_id'])) {
                 sendResponse(400, [
                     'error' => true,
                     'message' => 'User ID is required'
@@ -101,7 +101,7 @@ try {
             
             // Check if user exists and belongs to company
             $stmt = $conn->prepare("SELECT id FROM users WHERE id = ? AND company_id = ?");
-            $stmt->execute([$_GET['id'], $data['company_id']]);
+            $stmt->execute([$data['user_id'], $data['company_id']]);
             if (!$stmt->fetch()) {
                 sendResponse(404, [
                     'error' => true,
@@ -120,7 +120,7 @@ try {
             if (isset($data['email'])) {
                 // Check if new email already exists
                 $stmt = $conn->prepare("SELECT id FROM users WHERE email = ? AND id != ?");
-                $stmt->execute([$data['email'], $_GET['id']]);
+                $stmt->execute([$data['email'], $data['user_id']]);
                 if ($stmt->fetch()) {
                     sendResponse(400, [
                         'error' => true,
@@ -153,7 +153,7 @@ try {
                 ]);
             }
             
-            $params[] = $_GET['id'];
+            $params[] = $data['user_id'];
             $params[] = $data['company_id'];
             
             $stmt = $conn->prepare("
@@ -171,7 +171,7 @@ try {
             
         case 'DELETE':
             // Delete user
-            if (!isset($_GET['id'])) {
+            if (!isset($data['user_id'])) {
                 sendResponse(400, [
                     'error' => true,
                     'message' => 'User ID is required'
@@ -180,7 +180,7 @@ try {
             
             // Check if user exists and belongs to company
             $stmt = $conn->prepare("SELECT id FROM users WHERE id = ? AND company_id = ?");
-            $stmt->execute([$_GET['id'], $data['company_id']]);
+            $stmt->execute([$data['user_id'], $data['company_id']]);
             if (!$stmt->fetch()) {
                 sendResponse(404, [
                     'error' => true,
@@ -189,7 +189,7 @@ try {
             }
             
             $stmt = $conn->prepare("DELETE FROM users WHERE id = ? AND company_id = ?");
-            $stmt->execute([$_GET['id'], $data['company_id']]);
+            $stmt->execute([$data['user_id'], $data['company_id']]);
             
             sendResponse(200, [
                 'success' => true,

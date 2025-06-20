@@ -145,12 +145,15 @@ try {
         
         sendResponse(200, [
             'success' => true,
-            'statistics' => [
-                'total_tickets' => (int)$stats['total_tickets'],
-                'paid_tickets' => (int)$stats['paid_tickets'],
-                'unpaid_tickets' => (int)$stats['unpaid_tickets']
-            ],
-            'tickets' => $tickets
+            'message' => 'Tickets retrieved successfully',
+            'data' => [
+                'statistics' => [
+                    'total_tickets' => (int)$stats['total_tickets'],
+                    'paid_tickets' => (int)$stats['paid_tickets'],
+                    'unpaid_tickets' => (int)$stats['unpaid_tickets']
+                ],
+                'tickets' => $tickets
+            ]
         ]);
     }
     

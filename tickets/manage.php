@@ -152,7 +152,7 @@ try {
             
         case 'POST':
             // Create new ticket
-            validateRequiredFields(['vehicle_id', 'trip_id', 'officer_id', 'destination_id', 'route', 'location'], $data);
+            validateRequiredFields(['vehicle_id', 'trip_id', 'officer_id', 'destination_id', 'route', 'location', 'customer_name', 'customer_phone', 'seat_number', 'fare_amount'], $data);
             
             // Verify vehicle exists and belongs to company
             $stmt = $conn->prepare("SELECT id FROM vehicles WHERE id = ? AND company_id = ?");
@@ -211,8 +211,9 @@ try {
                 INSERT INTO tickets (
                     company_id, vehicle_id, trip_id, officer_id, 
                     offense_id, destination_id, booking_id, route, 
-                    location, status, included_in_delivery
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    location, status, included_in_delivery,
+                    customer_name, customer_phone, seat_number, fare_amount
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ");
             
             $stmt->execute([
@@ -226,7 +227,11 @@ try {
                 $data['route'],
                 $data['location'],
                 $data['status'] ?? 'unpaid',
-                $data['included_in_delivery'] ?? 0
+                $data['included_in_delivery'] ?? 0,
+                $data['customer_name'],
+                $data['customer_phone'],
+                $data['seat_number'],
+                $data['fare_amount']
             ]);
             
             $ticket_id = $conn->lastInsertId();
@@ -280,7 +285,8 @@ try {
             $allowedFields = [
                 'vehicle_id', 'trip_id', 'officer_id', 'offense_id',
                 'destination_id', 'booking_id', 'route', 'location',
-                'status', 'included_in_delivery'
+                'status', 'included_in_delivery',
+                'customer_name', 'customer_phone', 'seat_number', 'fare_amount'
             ];
             
             foreach ($allowedFields as $field) {
@@ -297,7 +303,6 @@ try {
                             ]);
                         }
                     }
-                    
                     $updateFields[] = "$field = ?";
                     $params[] = $data[$field];
                 }

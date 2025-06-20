@@ -258,7 +258,7 @@ try {
             sendResponse(201, [
                 'success' => true,
                 'message' => 'Ticket created successfully',
-                'ticket' => $ticket
+                'data' => $ticket
             ]);
             break;
             
@@ -348,7 +348,7 @@ try {
             sendResponse(200, [
                 'success' => true,
                 'message' => 'Ticket updated successfully',
-                'ticket' => $updated_ticket
+                'data' => $updated_ticket
             ]);
             break;
             

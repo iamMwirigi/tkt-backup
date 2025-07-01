@@ -65,9 +65,28 @@ try {
     $stmt->execute([$data['company_id']]);
     $vehicles = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-    // Remove unwanted fields from each vehicle
-    $filtered_vehicles = array_map(function($vehicle) {
+    // Collect all unique vehicle_configuration_ids
+    $config_ids = array_unique(array_filter(array_column($vehicles, 'vehicle_configuration_id')));
+    $layouts = [];
+    if (!empty($config_ids)) {
+        // Fetch all relevant configurations in one query
+        $in  = str_repeat('?,', count($config_ids) - 1) . '?';
+        $stmt2 = $conn->prepare("SELECT id, layout FROM vehicle_configurations WHERE id IN ($in)");
+        $stmt2->execute($config_ids);
+        while ($row = $stmt2->fetch(PDO::FETCH_ASSOC)) {
+            // Decode layout if it's JSON
+            $layouts[$row['id']] = json_decode($row['layout'], true);
+        }
+    }
+
+    // Remove unwanted fields and add layout
+    $filtered_vehicles = array_map(function($vehicle) use ($layouts) {
         unset($vehicle['owner_id'], $vehicle['owner_name'], $vehicle['owner_phone'], $vehicle['vehicle_type_id']);
+        if (!empty($vehicle['vehicle_configuration_id']) && isset($layouts[$vehicle['vehicle_configuration_id']])) {
+            $vehicle['layout'] = $layouts[$vehicle['vehicle_configuration_id']];
+        } else {
+            $vehicle['layout'] = null;
+        }
         return $vehicle;
     }, $vehicles);
 

@@ -69,12 +69,10 @@ try {
     $config_ids = array_unique(array_filter(array_column($vehicles, 'vehicle_configuration_id')));
     $layouts = [];
     if (!empty($config_ids)) {
-        // Fetch all relevant configurations in one query
-        $in  = str_repeat('?,', count($config_ids) - 1) . '?';
+        $in = implode(',', array_fill(0, count($config_ids), '?'));
         $stmt2 = $conn->prepare("SELECT id, layout FROM vehicle_configurations WHERE id IN ($in)");
-        $stmt2->execute($config_ids);
+        $stmt2->execute(array_values($config_ids));
         while ($row = $stmt2->fetch(PDO::FETCH_ASSOC)) {
-            // Decode layout if it's JSON
             $layouts[$row['id']] = json_decode($row['layout'], true);
         }
     }

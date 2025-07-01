@@ -163,17 +163,30 @@ try {
             
             try {
                 // Create vehicle
-                $stmt = $conn->prepare("
-                    INSERT INTO vehicles (
-                        plate_number, vehicle_type, company_id
-                    ) VALUES (?, ?, ?)
-                ");
-                
-                $stmt->execute([
-                    $data['plate_number'],
-                    $data['vehicle_type'],
-                    $data['company_id']
-                ]);
+                if (isset($data['vehicle_configuration_id'])) {
+                    $stmt = $conn->prepare("
+                        INSERT INTO vehicles (
+                            plate_number, vehicle_type, company_id, vehicle_configuration_id
+                        ) VALUES (?, ?, ?, ?)
+                    ");
+                    $stmt->execute([
+                        $data['plate_number'],
+                        $data['vehicle_type'],
+                        $data['company_id'],
+                        $data['vehicle_configuration_id']
+                    ]);
+                } else {
+                    $stmt = $conn->prepare("
+                        INSERT INTO vehicles (
+                            plate_number, vehicle_type, company_id
+                        ) VALUES (?, ?, ?)
+                    ");
+                    $stmt->execute([
+                        $data['plate_number'],
+                        $data['vehicle_type'],
+                        $data['company_id']
+                    ]);
+                }
                 
                 $vehicle_id = $conn->lastInsertId();
                 
@@ -255,7 +268,8 @@ try {
                 
                 $allowed_fields = [
                     'plate_number',
-                    'vehicle_type'
+                    'vehicle_type',
+                    'vehicle_configuration_id'
                 ];
                 
                 foreach ($allowed_fields as $field) {

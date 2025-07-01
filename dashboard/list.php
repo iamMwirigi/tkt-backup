@@ -99,7 +99,7 @@ try {
             COUNT(*) as total_tickets,
             SUM(CASE WHEN t.status = 'paid' THEN 1 ELSE 0 END) as paid_tickets,
             SUM(CASE WHEN t.status = 'unpaid' THEN 1 ELSE 0 END) as unpaid_tickets,
-            COALESCE(SUM(CASE WHEN t.status = 'paid' THEN fare_amount ELSE 0 END), 0) as total_sales
+            COALESCE(SUM(CASE WHEN t.status = 'paid' THEN t.fare_amount ELSE 0 END), 0) as total_sales
         FROM tickets t
         LEFT JOIN bookings b ON t.booking_id = b.id
         LEFT JOIN users u ON t.officer_id = u.id
@@ -115,7 +115,7 @@ try {
             SUM(CASE WHEN b.status = 'cancelled' THEN 1 ELSE 0 END) as cancelled_bookings,
             SUM(CASE WHEN b.status = 'booked' THEN 1 ELSE 0 END) as active_bookings,
             SUM(CASE WHEN b.status = 'converted' THEN 1 ELSE 0 END) as converted_bookings,
-            COALESCE(SUM(CASE WHEN b.status = 'booked' THEN fare_amount ELSE 0 END), 0) as total_booking_amount
+            COALESCE(SUM(CASE WHEN b.status = 'booked' THEN b.fare_amount ELSE 0 END), 0) as total_booking_amount
         FROM bookings b
         WHERE b.company_id = ? AND DATE(b.booked_at) BETWEEN ? AND ? $additional_where
     ");

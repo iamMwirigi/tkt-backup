@@ -70,6 +70,8 @@ try {
                     ]);
                 }
                 
+                // Remove unwanted fields from vehicle
+                unset($vehicle['owner_id'], $vehicle['owner_name'], $vehicle['owner_phone'], $vehicle['vehicle_type_id']);
                 sendResponse(200, [
                     'success' => true,
                     'vehicle' => $vehicle
@@ -112,10 +114,14 @@ try {
                 ");
                 $stmt->execute($params);
                 $vehicles = $stmt->fetchAll(PDO::FETCH_ASSOC);
-                
+                // Remove unwanted fields from each vehicle
+                $filtered_vehicles = array_map(function($vehicle) {
+                    unset($vehicle['owner_id'], $vehicle['owner_name'], $vehicle['owner_phone'], $vehicle['vehicle_type_id']);
+                    return $vehicle;
+                }, $vehicles);
                 sendResponse(200, [
                     'success' => true,
-                    'vehicles' => $vehicles
+                    'vehicles' => $filtered_vehicles
                 ]);
             }
             break;
@@ -207,6 +213,8 @@ try {
                 $stmt->execute([$vehicle_id]);
                 $vehicle = $stmt->fetch(PDO::FETCH_ASSOC);
                 
+                // Remove unwanted fields from vehicle
+                unset($vehicle['owner_id'], $vehicle['owner_name'], $vehicle['owner_phone'], $vehicle['vehicle_type_id']);
                 $conn->commit();
                 
                 sendResponse(201, [
@@ -341,6 +349,8 @@ try {
                 $stmt->execute([$data['id']]);
                 $updated_vehicle = $stmt->fetch(PDO::FETCH_ASSOC);
                 
+                // Remove unwanted fields from vehicle
+                unset($updated_vehicle['owner_id'], $updated_vehicle['owner_name'], $updated_vehicle['owner_phone'], $updated_vehicle['vehicle_type_id']);
                 $conn->commit();
                 
                 sendResponse(200, [

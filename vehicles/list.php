@@ -65,11 +65,17 @@ try {
     $stmt->execute([$data['company_id']]);
     $vehicles = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
+    // Remove unwanted fields from each vehicle
+    $filtered_vehicles = array_map(function($vehicle) {
+        unset($vehicle['owner_id'], $vehicle['owner_name'], $vehicle['owner_phone'], $vehicle['vehicle_type_id']);
+        return $vehicle;
+    }, $vehicles);
+
     sendResponse(200, [
         'success' => true,
         'message' => 'Vehicles retrieved successfully',
         'data' => [
-            'vehicles' => $vehicles
+            'vehicles' => $filtered_vehicles
         ]
     ]);
 

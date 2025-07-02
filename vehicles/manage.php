@@ -176,16 +176,16 @@ try {
                         $data['vehicle_configuration_id']
                     ]);
                 } else {
-                    $stmt = $conn->prepare("
-                        INSERT INTO vehicles (
-                            plate_number, vehicle_type, company_id
-                        ) VALUES (?, ?, ?)
-                    ");
-                    $stmt->execute([
-                        $data['plate_number'],
-                        $data['vehicle_type'],
-                        $data['company_id']
-                    ]);
+                $stmt = $conn->prepare("
+                    INSERT INTO vehicles (
+                        plate_number, vehicle_type, company_id
+                    ) VALUES (?, ?, ?)
+                ");
+                $stmt->execute([
+                    $data['plate_number'],
+                    $data['vehicle_type'],
+                    $data['company_id']
+                ]);
                 }
                 
                 $vehicle_id = $conn->lastInsertId();

@@ -54,31 +54,31 @@ try {
             }
             
             // Always create new configuration
-            $stmt = $conn->prepare("
-                INSERT INTO vehicle_configurations (
-                    company_id,
-                    vehicle_type,
-                    total_seats,
-                    row_count,
-                    column_count,
-                    layout
-                ) VALUES (?, ?, ?, ?, ?, ?)
-            ");
-            
-            $stmt->execute([
-                $data['company_id'],
-                $data['vehicle_type'],
-                $data['total_seats'],
-                $data['row_count'],
-                $data['column_count'],
-                json_encode($data['layout'])
-            ]);
+                $stmt = $conn->prepare("
+                    INSERT INTO vehicle_configurations (
+                        company_id,
+                        vehicle_type,
+                        total_seats,
+                        row_count,
+                        column_count,
+                        layout
+                    ) VALUES (?, ?, ?, ?, ?, ?)
+                ");
+                
+                $stmt->execute([
+                    $data['company_id'],
+                    $data['vehicle_type'],
+                    $data['total_seats'],
+                    $data['row_count'],
+                    $data['column_count'],
+                    json_encode($data['layout'])
+                ]);
 
-            sendResponse(201, [
-                'error' => false,
-                'message' => 'Vehicle configuration created successfully',
-                'id' => $conn->lastInsertId()
-            ]);
+                sendResponse(201, [
+                    'error' => false,
+                    'message' => 'Vehicle configuration created successfully',
+                    'id' => $conn->lastInsertId()
+                ]);
             break;
             
         case 'PUT':

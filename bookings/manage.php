@@ -212,6 +212,10 @@ try {
             
             $booking_id = $conn->lastInsertId();
             
+            // Update seat status to 'booked'
+            $stmt = $conn->prepare("UPDATE vehicle_seats SET is_reserved = 'booked' WHERE vehicle_id = ? AND seat_number = ?");
+            $stmt->execute([$data['vehicle_id'], $data['seat_number']]);
+            
             // Get created booking
             $stmt = $conn->prepare("
                 SELECT b.*, 

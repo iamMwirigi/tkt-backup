@@ -128,7 +128,7 @@ try {
                 $data['device_id'],
                 $_SERVER['HTTP_USER_AGENT'] ?? 'Unknown Device'
             ]);
-        } else if ($device['user_id'] === null) {
+        } else if (isset($device['user_id']) && $device['user_id'] === null) {
             // Update existing device with user_id if it wasn't set
             $stmt = $conn->prepare("
                 UPDATE devices 

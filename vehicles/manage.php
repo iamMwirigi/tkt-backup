@@ -220,19 +220,25 @@ try {
                     if ($config && !empty($config['layout'])) {
                         $layout = json_decode($config['layout'], true);
                         if (is_array($layout)) {
-                            foreach ($layout as $seat) {
-                                // Each seat should have seat_number and position (optionally is_reserved)
-                                if (!empty($seat['seat_number']) && !empty($seat['position'])) {
-                                    $stmt_insert = $conn->prepare("
-                                        INSERT INTO vehicle_seats (vehicle_id, seat_number, position, is_reserved)
-                                        VALUES (?, ?, ?, ?)
-                                    ");
-                                    $stmt_insert->execute([
-                                        $vehicle_id,
-                                        $seat['seat_number'],
-                                        $seat['position'],
-                                        isset($seat['is_reserved']) ? $seat['is_reserved'] : 0
-                                    ]);
+                            // Handle 2D array with 'label' as seat_number
+                            foreach ($layout as $rowIndex => $row) {
+                                if (is_array($row)) {
+                                    foreach ($row as $colIndex => $seat) {
+                                        if (is_array($seat) && !empty($seat['label'])) {
+                                            $seat_number = $seat['label'];
+                                            $position = 'row' . ($rowIndex + 1) . '-col' . ($colIndex + 1);
+                                            $stmt_insert = $conn->prepare("
+                                                INSERT INTO vehicle_seats (vehicle_id, seat_number, position, is_reserved)
+                                                VALUES (?, ?, ?, ?)
+                                            ");
+                                            $stmt_insert->execute([
+                                                $vehicle_id,
+                                                $seat_number,
+                                                $position,
+                                                isset($seat['is_reserved']) ? $seat['is_reserved'] : 0
+                                            ]);
+                                        }
+                                    }
                                 }
                             }
                         }

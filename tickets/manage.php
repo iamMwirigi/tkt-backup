@@ -212,8 +212,9 @@ try {
                     company_id, vehicle_id, trip_id, officer_id, 
                     offense_id, destination_id, booking_id, route, 
                     location, status, included_in_delivery,
-                    customer_name, customer_phone, seat_number, fare_amount
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    customer_name, customer_phone, seat_number, fare_amount,
+                    national_id, comments
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ");
             
             $stmt->execute([
@@ -231,7 +232,9 @@ try {
                 $data['customer_name'],
                 $data['customer_phone'],
                 $data['seat_number'],
-                $data['fare_amount']
+                $data['fare_amount'],
+                $data['national_id'] ?? null,
+                $data['comments'] ?? null
             ]);
             
             $ticket_id = $conn->lastInsertId();
@@ -254,6 +257,10 @@ try {
             ");
             $stmt->execute([$ticket_id]);
             $ticket = $stmt->fetch(PDO::FETCH_ASSOC);
+            
+            // Add national_id and comments to response if present
+            $ticket['national_id'] = $data['national_id'] ?? null;
+            $ticket['comments'] = $data['comments'] ?? null;
             
             sendResponse(201, [
                 'success' => true,

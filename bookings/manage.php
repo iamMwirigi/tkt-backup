@@ -169,6 +169,18 @@ try {
                 ]);
             }
             
+            // Fetch vehicle_id for the trip
+            $stmt = $conn->prepare("SELECT vehicle_id FROM trips WHERE id = ?");
+            $stmt->execute([$data['trip_id']]);
+            $trip = $stmt->fetch(PDO::FETCH_ASSOC);
+            if (!$trip) {
+                sendResponse(404, [
+                    'error' => true,
+                    'message' => 'Trip not found'
+                ]);
+            }
+            $vehicle_id = $trip['vehicle_id'];
+            
             // Check if seat is already booked
             $stmt = $conn->prepare("
                 SELECT id 
@@ -187,6 +199,7 @@ try {
             $stmt = $conn->prepare("
                 INSERT INTO bookings (
                     trip_id, 
+                    vehicle_id,
                     user_id,
                     customer_name, 
                     customer_phone, 
@@ -195,12 +208,13 @@ try {
                     fare_amount,
                     status,
                     company_id
-                ) SELECT ?, ?, ?, ?, ?, ?, d.current_fare, 'booked', ?
+                ) SELECT ?, ?, ?, ?, ?, ?, ?, d.current_fare, 'booked', ?
                 FROM destinations d
                 WHERE d.id = ?
             ");
             $stmt->execute([
                 $data['trip_id'],
+                $vehicle_id,
                 $data['user_id'] ?? null,
                 $data['customer_name'],
                 $data['customer_phone'],
@@ -214,7 +228,7 @@ try {
             
             // Update seat status to 'booked'
             $stmt = $conn->prepare("UPDATE vehicle_seats SET is_reserved = 'booked' WHERE vehicle_id = ? AND seat_number = ?");
-            $stmt->execute([$data['vehicle_id'], $data['seat_number']]);
+            $stmt->execute([$vehicle_id, $data['seat_number']]);
             
             // Get created booking
             $stmt = $conn->prepare("

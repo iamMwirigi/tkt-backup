@@ -210,6 +210,34 @@ try {
                     ");
                     $stmt->execute([$data['owner_id'], $vehicle_id]);
                 }
+
+                // Automatically create seats if vehicle_configuration_id is provided
+                if (isset($data['vehicle_configuration_id'])) {
+                    // Fetch layout from configuration
+                    $stmt = $conn->prepare("SELECT layout FROM vehicle_configurations WHERE id = ?");
+                    $stmt->execute([$data['vehicle_configuration_id']]);
+                    $config = $stmt->fetch(PDO::FETCH_ASSOC);
+                    if ($config && !empty($config['layout'])) {
+                        $layout = json_decode($config['layout'], true);
+                        if (is_array($layout)) {
+                            foreach ($layout as $seat) {
+                                // Each seat should have seat_number and position (optionally is_reserved)
+                                if (!empty($seat['seat_number']) && !empty($seat['position'])) {
+                                    $stmt_insert = $conn->prepare("
+                                        INSERT INTO vehicle_seats (vehicle_id, seat_number, position, is_reserved)
+                                        VALUES (?, ?, ?, ?)
+                                    ");
+                                    $stmt_insert->execute([
+                                        $vehicle_id,
+                                        $seat['seat_number'],
+                                        $seat['position'],
+                                        isset($seat['is_reserved']) ? $seat['is_reserved'] : 0
+                                    ]);
+                                }
+                            }
+                        }
+                    }
+                }
                 
                 // Get created vehicle with owner info
                 $stmt = $conn->prepare("

@@ -89,6 +89,13 @@ try {
     $stmt->execute($params);
     $seats = $stmt->fetchAll(PDO::FETCH_ASSOC);
     
+    // Set is_reserved to 'available' if empty or falsy
+    foreach ($seats as &$seat) {
+        if (empty($seat['is_reserved'])) {
+            $seat['is_reserved'] = 'available';
+        }
+    }
+
     sendResponse(200, [
         'success' => true,
         'message' => 'Vehicle seats retrieved successfully',

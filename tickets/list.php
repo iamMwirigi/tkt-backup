@@ -111,7 +111,8 @@ try {
             SELECT 
                 COUNT(*) as total_tickets,
                 SUM(CASE WHEN status = 'paid' THEN 1 ELSE 0 END) as paid_tickets,
-                SUM(CASE WHEN status = 'unpaid' THEN 1 ELSE 0 END) as unpaid_tickets
+                SUM(CASE WHEN status = 'unpaid' THEN 1 ELSE 0 END) as unpaid_tickets,
+                SUM(CASE WHEN fare_amount IS NOT NULL THEN fare_amount ELSE 0 END) as total_ticket_sales
             FROM tickets t
             WHERE $where_clause
         ");
@@ -150,7 +151,8 @@ try {
                 'statistics' => [
                     'total_tickets' => (int)$stats['total_tickets'],
                     'paid_tickets' => (int)$stats['paid_tickets'],
-                    'unpaid_tickets' => (int)$stats['unpaid_tickets']
+                    'unpaid_tickets' => (int)$stats['unpaid_tickets'],
+                    'total_ticket_sales' => (float)$stats['total_ticket_sales']
                 ],
                 'tickets' => $tickets
             ]
